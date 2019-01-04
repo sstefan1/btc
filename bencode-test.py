@@ -26,10 +26,10 @@ def sha1_file(filepath, BUFF_SIZE):
     result = []
     with open(filepath, 'rb') as f:
         while True:
-            data = f.read(BUF_SIZE)
+            data = f.read(BUFF_SIZE)
             if not data:
                 break;
-            result.append(ihashlib.sha1(data).digest())
+            result.append(hashlib.sha1(data).digest())
 
     return ''.join(result)
 
