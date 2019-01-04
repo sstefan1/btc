@@ -1,4 +1,6 @@
-import bencode, hashlib, os
+import bencode
+import hashlib
+import os
 
 
 def create_torrent(tracker, file):
@@ -8,7 +10,7 @@ def create_torrent(tracker, file):
     size = os.path.getsize(file)
 
     # Default piece length is 512kB.
-    piece_length = 2**9
+    piece_length = (2**9) * 1000
     pieces = sha1_file(file, piece_length)
 
     # info dictionary.
@@ -18,8 +20,9 @@ def create_torrent(tracker, file):
     be = bencode.encode(be_dict)
 
     torrent_path = file + ".torrent"
-    with open(torrent_path, 'a') as torrent_file:
-        torrent_file.write(be.decode("utf-8"))
+    # bencode.bwrite(be, torrent_path)
+    with open(torrent_path, 'wb') as torrent_file:
+        torrent_file.write(be)
 
 
 def sha1_file(filepath, BUFF_SIZE):
@@ -29,14 +32,17 @@ def sha1_file(filepath, BUFF_SIZE):
             data = f.read(BUFF_SIZE)
             if not data:
                 break;
-            result.append(hashlib.sha1(data).digest())
+            piece_hash = hashlib.sha1(data).digest()
+            result.append(piece_hash)
 
-    return ''.join(result)
+    return b''.join(result)
 
 # with open(r"C:\Users\stefan\Desktop\book.pdf", 'rb') as f:
+
 
 def main():
     create_torrent("192.168.1.10/announce:6192", r"C:\Users\stefan\Desktop\book.pdf")
 
+
 if __name__ == "__main__":
-   main()
+    main()
