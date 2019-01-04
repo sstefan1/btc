@@ -34,3 +34,9 @@ def sha1_file(filepath, BUFF_SIZE):
     return ''.join(result)
 
 # with open(r"C:\Users\stefan\Desktop\book.pdf", 'rb') as f:
+
+def main():
+    create_torrent("192.168.1.10/announce:6192", r"C:\Users\stefan\Desktop\book.pdf")
+
+if __name__ == "__main__":
+   main()
