@@ -2,6 +2,8 @@ import bencode
 import hashlib
 import os
 
+from torrent import  TrackerInfo, TorrentInfo
+
 
 def create_torrent(tracker, file):
     be_dict = {'announce': tracker}
@@ -40,8 +42,22 @@ def sha1_file(filepath, BUFF_SIZE):
 # with open(r"C:\Users\stefan\Desktop\book.pdf", 'rb') as f:
 
 
+def parse_torrent_file(file):
+    with open(file, 'rb') as f:
+        data = f.read()
+        be_data = bencode.decode(data)
+        return be_data
+        # tracker = TrackerInfo()
+
+
 def main():
-    create_torrent("192.168.1.10/announce:6192", r"C:\Users\stefan\Desktop\book.pdf")
+    file_path = r"C:\Users\stefan\Desktop\book.pdf"
+    create_torrent("192.168.1.10/announce:6192", file_path)
+    be_dict = parse_torrent_file(file_path + ".torrent")
+    tracker = TrackerInfo.Tracker(be_dict['announce'])
+    info = be_dict['info']
+    torrent = TorrentInfo.Torrent(info['name'], "N/A", file_path, tracker, info['piece_length'], info['pieces'])
+    a = torrent
 
 
 if __name__ == "__main__":
