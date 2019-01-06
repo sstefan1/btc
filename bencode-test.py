@@ -16,7 +16,7 @@ def create_torrent(tracker, file):
     pieces = sha1_file(file, piece_length)
 
     # info dictionary.
-    info_dict = {'length': size, 'name': name, 'piece_length': piece_length, 'pieces': pieces}
+    info_dict = {'length': size, 'name': name, 'piece length': piece_length, 'pieces': pieces}
     be_dict['info'] = info_dict
 
     be = bencode.encode(be_dict)
@@ -52,11 +52,13 @@ def parse_torrent_file(file):
 
 def main():
     file_path = r"C:\Users\stefan\Desktop\book.pdf"
-    create_torrent("192.168.1.10/announce:6192", file_path)
+    # create_torrent("http://192.168.1.6:6969/announce", file_path)
     be_dict = parse_torrent_file(file_path + ".torrent")
     tracker = TrackerInfo.Tracker(be_dict['announce'])
     info = be_dict['info']
-    torrent = TorrentInfo.Torrent(info['name'], "N/A", file_path, tracker, info['piece_length'], info['pieces'])
+    torrent = TorrentInfo.Torrent(info, "N/A", file_path, tracker)
+
+    torrent.update(0, 123, 5555)
     a = torrent
 
 
