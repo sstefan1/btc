@@ -2,7 +2,7 @@ import bencode
 import hashlib
 import os
 
-from torrent import  TrackerInfo, TorrentInfo
+from torrent import  TrackerInfo, TorrentInfo, Peer
 
 
 def create_torrent(tracker, file):
@@ -52,14 +52,16 @@ def parse_torrent_file(file):
 
 def main():
     file_path = r"C:\Users\stefan\Desktop\book.pdf"
-    # create_torrent("http://192.168.1.6:6969/announce", file_path)
+    create_torrent("http://192.168.1.9:6969/announce", file_path)
     be_dict = parse_torrent_file(file_path + ".torrent")
     tracker = TrackerInfo.Tracker(be_dict['announce'])
     info = be_dict['info']
     torrent = TorrentInfo.Torrent(info, "N/A", file_path, tracker)
 
     torrent.update(0, 123, 5555)
-    a = torrent
+
+    peer = Peer.Peer(torrent, '192.168.1.4', 6666, b'01234567890123456789')
+    peer.send_handshake()
 
 
 if __name__ == "__main__":
