@@ -14,3 +14,6 @@ class FileInfo:
 
     def get_piece_size(self, piece_size):
         pass
+
+    def send_block(piece, block):
+        offset

@@ -61,7 +61,6 @@ class Tracker:
                                 torrent.downloaded, torrent.file.size,
                                 tracker_event_string(event))
 
-        url_hardcoded = "http://192.168.1.6:6969/announce?info_hash=%9E%D5%B1%A6%CD%5E%CB%F21%AAv%C0P%D2%1F!%813%12%CC&peer_id=%B6%B3%01k%D7%BB%5D%B3%A2p%5E%D3VE%5EP%D3z%00%CF&port=6881&uploaded=0&downloaded=0&left=5257556&compact=1&event=started"
         url_hardcoded_1 = "http://192.168.1.9:6969/announce?info_hash=%9E%D5%B1%A6%CD%5E%CB%F21%AAv%C0P%D2%1F!%813%12%CC&peer_id=01234567890123456789&port=6881&uploaded=0&downloaded=0&left=5257556&compact=1&event=started"
         response = requests.get(url_hardcoded_1)
         self.handle_response(response)

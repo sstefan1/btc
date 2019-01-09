@@ -17,20 +17,23 @@ class Peer:
 
     #  send handshake encoded message
     def send_handshake(self):
-        peers = self.tracker.peers
+        peers = self.torrent.tracker.peers
+
+        #  this is a tuple.
+        peer = peers[0]
 
         #  construct the handshake message
         name_length = bytes([19])
         protocol_name = b'BitTorrent protocol'
-        reserved_flags = b' ' * 8
+        reserved_flags = b'\0' * 8
 
         info_hash = self.torrent.urlInfoHash
         peer_id = self.peer_id
 
-        hadnskahe_msg = name_length + protocol_name + info_hash + peer_id
+        handshake_msg = name_length + protocol_name + reserved_flags + info_hash + peer_id
 
         peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        peer_socket.connect((self.host, self.port))
+        peer_socket.connect((peer[0], peer[1]))
         peer_socket.send(handshake_msg)
 
         #  handshake msg is exactly 68 bytes long
