@@ -18,11 +18,11 @@ def slash_escape(err):
 
 codecs.register_error('slash_escape', slash_escape)
 
-class FileInfo:
-    def __init__(self, path):
-        self.path = path
-        self.size = os.path.getsize(path)
-        self.offset = None
+#  class FileInfo:
+    #  def __init__(self, path):
+        #  self.path = path
+        #  self.size = os.path.getsize(path)
+        #  self.offset = None
 
 
 class Torrent:
