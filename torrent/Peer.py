@@ -20,7 +20,7 @@ class Peer:
         peers = self.torrent.tracker.peers
 
         #  this is a tuple.
-        peer = peers[0]
+        peer = peers[2]
 
         #  construct the handshake message
         name_length = bytes([19])
@@ -33,9 +33,13 @@ class Peer:
         handshake_msg = name_length + protocol_name + reserved_flags + info_hash + peer_id
 
         peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        #  hardcoded port, discovered via wireshark
+        #  for now, tracker returns wrong port.
+        #  peer_socket.connect((peer[0], 52929))
         peer_socket.connect((peer[0], peer[1]))
         peer_socket.send(handshake_msg)
 
         #  handshake msg is exactly 68 bytes long
-        response = socket.recv(68)
+        response = peer_socket.recv(68)
         print(response)
