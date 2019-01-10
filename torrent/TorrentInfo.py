@@ -5,6 +5,8 @@ import urllib.parse
 from hashlib import sha1
 from math import ceil
 
+from torrent import FileInfo
+
 
 def slash_escape(err):
     """ codec error handler. err is UnicodeDecode instance. Returns
@@ -29,7 +31,7 @@ class Torrent:
     def __init__(self, info, location, file_path, tracker, block_size=16384):
         self.name = info['name']
         self.download_dir = location
-        self.file = FileInfo(file_path)
+        self.file = FileInfo.FileInfo(file_path)
         self.downloaded = 0
         self.uploaded = 0
 

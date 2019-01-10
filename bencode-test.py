@@ -2,7 +2,7 @@ import bencode
 import hashlib
 import os
 
-from torrent import  TrackerInfo, TorrentInfo, Peer
+from torrent import TrackerInfo, TorrentInfo, Peer
 
 
 def create_torrent(tracker, file):
