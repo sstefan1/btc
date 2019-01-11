@@ -1,5 +1,7 @@
 import requests
 import bencode
+import struct
+import socket
 from enum import Enum
 from datetime import timedelta, datetime
 from socket import ntohs
@@ -45,8 +47,13 @@ class Tracker:
 
         for i in range(len(peer_info) // 6):
             offset = i * 6
-            ip_address = str(peer_info[offset]) + '.' + str(peer_info[offset + 1]) + '.' + str(peer_info[offset + 2]) + '.' + str(peer_info[offset + 3])
-            port = ntohs(peer_info[offset + 4])
+            # Format: ! -> treats numbers with network byte order (big endian)
+            # Format: 4s <=> ssss -> bytes
+            # format: H -> integer (ctype -- unsigned short)
+            ip, port = struct.unpack('!4sH', peer_info[offset:offset + 6])
+            ip_address = socket.inet_ntoa(ip)
+            #  ip_address = str(peer_info[offset]) + '.' + str(peer_info[offset + 1]) + '.' + str(peer_info[offset + 2]) + '.' + str(peer_info[offset + 3])
+            #  port = ntohs(int(peer_info[offset + 4:offset + 6]))
             self.peers.append((ip_address, port))
 
     def update(self, torrent, event, peerid, port):
