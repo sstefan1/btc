@@ -1,25 +1,31 @@
-import sys
-import os
+#!/usr/bin/env python3
+
 import argparse
 import asyncio
 import logging
+import os
+import sys
 from contextlib import closing
-
 from functools import partial, partialmethod
-from PyQt5.QtWidgets import QMainWindow, QTextEdit, QAction, QApplication
-from PyQt5.QtGui import QIcon, QFont, QDropEvent
+from math import floor
 from typing import Dict, List, Optional
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
 
+# noinspection PyUnresolvedReferences
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+# noinspection PyUnresolvedReferences
+from PyQt5.QtGui import QIcon, QFont, QDropEvent
+# noinspection PyUnresolvedReferences
 from PyQt5.QtWidgets import QWidget, QListWidget, QAbstractItemView, QLabel, QVBoxLayout, QProgressBar, \
     QListWidgetItem, QMainWindow, QApplication, QFileDialog, QMessageBox, QDialog, QDialogButtonBox, QTreeWidget, \
     QTreeWidgetItem, QHeaderView, QHBoxLayout, QPushButton, QLineEdit, QAction
 
-from math import floor
+from torrent_client.control import ControlManager, ControlServer, ControlClient
 from torrent_client.models import TorrentState, TorrentInfo, FileTreeNode, FileInfo
 from torrent_client.utils import humanize_speed, humanize_time, humanize_size
-from torrent_client.control import manager
-from torrent_client.control import ControlManager, ControlServer, ControlClient
+
+
+logging.basicConfig(format='%(levelname)s %(asctime)s %(name)-23s %(message)s', datefmt='%H:%M:%S')
+
 
 ICON_DIRECTORY = os.path.join(os.path.dirname(__file__), 'icons')
 
@@ -204,32 +210,6 @@ class TorrentAddingDialog(QDialog):
         self.close()
 
 
-class TorrentListWidget(QListWidget):
-    files_dropped = pyqtSignal(list)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
-
-        self.setAcceptDrops(True)
-
-    def drag_handler(self, event: QDropEvent, drop: bool=False):
-        if event.mimeData().hasUrls():
-            event.setDropAction(Qt.CopyAction)
-            event.accept()
-
-            if drop:
-                self.files_dropped.emit([url.toLocalFile() for url in event.mimeData().urls()])
-        else:
-            event.ignore()
-
-    dragEnterEvent = drag_handler
-    dragMoveEvent = drag_handler
-    dropEvent = partialmethod(drag_handler, drop=True)
-
-
 class TorrentListWidgetItem(QWidget):
     _name_font = QFont()
     _name_font.setBold(True)
@@ -312,43 +292,57 @@ class TorrentListWidgetItem(QWidget):
         self._lower_status_label.setText(status_text)
 
 
-class Example(QMainWindow):
-    def __init__(self):
+class TorrentListWidget(QListWidget):
+    files_dropped = pyqtSignal(list)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+
+        self.setAcceptDrops(True)
+
+    def drag_handler(self, event: QDropEvent, drop: bool=False):
+        if event.mimeData().hasUrls():
+            event.setDropAction(Qt.CopyAction)
+            event.accept()
+
+            if drop:
+                self.files_dropped.emit([url.toLocalFile() for url in event.mimeData().urls()])
+        else:
+            event.ignore()
+
+    dragEnterEvent = drag_handler
+    dragMoveEvent = drag_handler
+    dropEvent = partialmethod(drag_handler, drop=True)
+
+
+class MainWindow(QMainWindow):
+    def __init__(self, control_thread: 'ControlManagerThread'):
         super().__init__()
 
-        self.initUI()
+        self._control_thread = control_thread
+        control = control_thread.control
 
-    def initUI(self):
-        textEdit = QTextEdit()
-        self.setCentralWidget(textEdit)
+        toolbar = self.addToolBar('Exits')
+        toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        toolbar.setMovable(False)
 
-        exitAct = QAction(QIcon('skull.png'), 'Exit', self)
-        exitAct.setShortcut('Ctrl+Q')
-        exitAct.setStatusTip('Exit application')
-        exitAct.triggered.connect(self.close)
-
-        self.statusBar()
-
-        menubar = self.menuBar()
-        fileMenu = menubar.addMenu('&File')
-        fileMenu.addAction(exitAct)
-
-        toolbar = self.addToolBar('Exit')
-        toolbar.addAction(exitAct)
         self._add_action = toolbar.addAction(load_icon('add'), 'Add')
         self._add_action.triggered.connect(self._add_torrents_triggered)
 
         self._pause_action = toolbar.addAction(load_icon('pause'), 'Pause')
         self._pause_action.setEnabled(False)
-        self._pause_action.triggered.connect(partial(self._control_action_triggered))
+        self._pause_action.triggered.connect(partial(self._control_action_triggered, control.pause))
 
         self._resume_action = toolbar.addAction(load_icon('resume'), 'Resume')
         self._resume_action.setEnabled(False)
-        self._resume_action.triggered.connect(partial(self._control_action_triggered))
+        self._resume_action.triggered.connect(partial(self._control_action_triggered, control.resume))
 
         self._remove_action = toolbar.addAction(load_icon('remove'), 'Remove')
         self._remove_action.setEnabled(False)
-        self._remove_action.triggered.connect(partial(self._control_action_triggered))
+        self._remove_action.triggered.connect(partial(self._control_action_triggered, control.remove))
 
         self._about_action = toolbar.addAction(load_icon('about'), 'About')
         self._about_action.triggered.connect(self._show_about)
@@ -360,16 +354,17 @@ class Example(QMainWindow):
 
         self.setCentralWidget(self._list_widget)
 
-        self.setGeometry(300, 300, 350, 250)
-        self.setWindowTitle('Main window')
-        self.show()
+        self.setMinimumSize(550, 450)
+        self.resize(600, 500)
+        self.setWindowTitle('BitTorrent Client')
 
-        # control_thread.error_happened.connect(self._error_happened)
-        # control.torrents_suggested.connect(self.add_torrent_files)
-        control = manager.ControlManager()
+        control_thread.error_happened.connect(self._error_happened)
+        control.torrents_suggested.connect(self.add_torrent_files)
         control.torrent_added.connect(self._add_torrent_item)
         control.torrent_changed.connect(self._update_torrent_item)
-        # control.torrent_removed.connect(self._remove_torrent_item)
+        control.torrent_removed.connect(self._remove_torrent_item)
+
+        self.show()
 
     def _add_torrent_item(self, state: TorrentState):
         widget = TorrentListWidgetItem()
@@ -391,39 +386,23 @@ class Example(QMainWindow):
         self._list_widget.setItemWidget(item, widget)
         self._torrent_to_item[state.info_hash] = item
 
-    def _control_action_triggered(self, action):
-        for item in self._list_widget.selectedItems():
-            widget = self._list_widget.itemWidget(item)
-            if widget.waiting_control_action:
-                continue
+    def _update_torrent_item(self, state: TorrentState):
+        if state.info_hash not in self._torrent_to_item:
+            return
 
-            info_hash = item.data(Qt.UserRole)
-            asyncio.run_coroutine_threadsafe(Example._invoke_control_action(action, info_hash),
-                                             self._control_thread.loop)
-            widget.waiting_control_action = True
+        widget = self._list_widget.itemWidget(self._torrent_to_item[state.info_hash])
+        if widget.state.paused != state.paused:
+            widget.waiting_control_action = False
+        widget.state = state
 
         self._update_control_action_state()
 
-    def _add_torrents_triggered(self):
-        paths, _ = QFileDialog.getOpenFileName(self, 'Add torrents', '','Torrent file (*.torrent)')
-        self.add_torrent_files(paths)
+    def _remove_torrent_item(self, info_hash: bytes):
+        item = self._torrent_to_item[info_hash]
+        self._list_widget.takeItem(self._list_widget.row(item))
+        del self._torrent_to_item[info_hash]
 
-    def _show_about(self):
-        pass
-
-    def add_torrent_files(self, paths: List[str]):
-        for path in paths:
-            try:
-                torrent_info = TorrentInfo.from_file(path, download_dir=None)
-                self._control_thread.control.last_torrent_dir = os.path.abspath(os.path.dirname(path))
-
-                if torrent_info.download_info.info_hash in self._torrent_to_item:
-                    raise ValueError('This torrent is already added')
-            except Exception as err:
-                self._error_happened('Failed to add "{}"'.format(path), err)
-                continue
-
-            TorrentAddingDialog(self, path, torrent_info, self._control_thread).exec()
+        self._update_control_action_state()
 
     def _update_control_action_state(self):
         self._pause_action.setEnabled(False)
@@ -440,19 +419,145 @@ class Example(QMainWindow):
                 self._pause_action.setEnabled(True)
             self._remove_action.setEnabled(True)
 
-    def _update_torrent_item(self, state: TorrentState):
-        if state.info_hash not in self._torrent_to_item:
-            return
+    def _error_happened(self, description: str, err: Exception):
+        QMessageBox.critical(self, description, str(err))
 
-        widget = self._list_widget.itemWidget(self._torrent_to_item[state.info_hash])
-        if widget.state.paused != state.paused:
-            widget.waiting_control_action = False
-        widget.state = state
+    def add_torrent_files(self, paths: List[str]):
+        for path in paths:
+            try:
+                torrent_info = TorrentInfo.from_file(path, download_dir=None)
+                self._control_thread.control.last_torrent_dir = os.path.abspath(os.path.dirname(path))
+
+                if torrent_info.download_info.info_hash in self._torrent_to_item:
+                    raise ValueError('This torrent is already added')
+            except Exception as err:
+                self._error_happened('Failed to add "{}"'.format(path), err)
+                continue
+
+            TorrentAddingDialog(self, path, torrent_info, self._control_thread).exec()
+
+    def _add_torrents_triggered(self):
+        paths, _ = QFileDialog.getOpenFileNames(self, 'Add torrents', self._control_thread.control.last_torrent_dir,
+                                                'Torrent file (*.torrent);;All files (*)')
+        self.add_torrent_files(paths)
+
+    @staticmethod
+    async def _invoke_control_action(action, info_hash: bytes):
+        try:
+            result = action(info_hash)
+            if asyncio.iscoroutine(result):
+                await result
+        except ValueError:
+            pass
+
+    def _control_action_triggered(self, action):
+        for item in self._list_widget.selectedItems():
+            widget = self._list_widget.itemWidget(item)
+            if widget.waiting_control_action:
+                continue
+
+            info_hash = item.data(Qt.UserRole)
+            asyncio.run_coroutine_threadsafe(MainWindow._invoke_control_action(action, info_hash),
+                                             self._control_thread.loop)
+            widget.waiting_control_action = True
 
         self._update_control_action_state()
 
+    def _show_about(self):
+        QMessageBox.about(self, 'About', '<p><b>Prototype of a BitTorrent client</b></p>'
+                                         '<p>Copyright &copy; 2016 Alexander Borzunov</p>'
+                                         '<p>Icons are made by Google and Freepik from '
+                                         '<a href="http://www.flaticon.com">www.flaticon.com</a></p>')
+
+
+class ControlManagerThread(QThread):
+    error_happened = pyqtSignal(str, Exception)
+
+    def __init__(self):
+        super().__init__()
+
+        self._loop = None  # type: asyncio.AbstractEventLoop
+        self._control = ControlManager()
+        self._control_server = ControlServer(self._control, None)
+        self._stopping = False
+
+    @property
+    def loop(self) -> asyncio.AbstractEventLoop:
+        return self._loop
+
+    @property
+    def control(self) -> ControlManager:
+        return self._control
+
+    def run(self):
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+        with closing(self._loop):
+            self._loop.run_until_complete(self._control.start())
+            self._loop.run_until_complete(self._control_server.start())
+
+            try:
+                self._control.load_state()
+            except Exception as err:
+                self.error_happened.emit('Failed to load program state', err)
+            self._control.invoke_state_dumps()
+
+            self._loop.run_forever()
+
+    def stop(self):
+        if self._stopping:
+            return
+        self._stopping = True
+
+        stop_fut = asyncio.run_coroutine_threadsafe(asyncio.wait([self._control_server.stop(), self._control.stop()]),
+                                                    self._loop)
+        stop_fut.add_done_callback(lambda fut: self._loop.stop())
+
+        self.wait()
+
+
+def suggest_torrents(manager: ControlManager, filenames: List[str]):
+    manager.torrents_suggested.emit(filenames)
+
+
+async def find_another_daemon(filenames: List[str]) -> bool:
+    try:
+        async with ControlClient() as client:
+            if filenames:
+                await client.execute(partial(suggest_torrents, filenames=filenames))
+        return True
+    except RuntimeError:
+        return False
+
+
+def main():
+    parser = argparse.ArgumentParser(description='A prototype of BitTorrent client (GUI)')
+    parser.add_argument('--debug', action='store_true', help='Show debug messages')
+    parser.add_argument('filenames', nargs='*', help='Torrent file names')
+    args = parser.parse_args()
+
+    if not args.debug:
+        logging.disable(logging.INFO)
+
+    app = QApplication(sys.argv)
+    app.setWindowIcon(load_icon('logo'))
+
+    with closing(asyncio.get_event_loop()) as loop:
+        if loop.run_until_complete(find_another_daemon(args.filenames)):
+            if not args.filenames:
+                QMessageBox.critical(None, 'Failed to start', 'Another program instance is already running')
+            return
+
+    control_thread = ControlManagerThread()
+    main_window = MainWindow(control_thread)
+
+    control_thread.start()
+    app.lastWindowClosed.connect(control_thread.stop)
+
+    main_window.add_torrent_files(args.filenames)
+
+    return app.exec()
+
 
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    ex = Example()
-    sys.exit(app.exec_())
+    sys.exit(main())
