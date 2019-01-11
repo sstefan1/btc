@@ -28,6 +28,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import QMainWindow
 
 
+
 class Example(QWidget):
     def __init__(self, q: mp.Queue):
         super().__init__()
@@ -124,16 +125,16 @@ class App(QWidget):
 def a():
     app = QApplication(sys.argv)
     ex = App()
-    sys.exit(app.exec_())
+    # sys.exit(app.exec_())
 
 
 def b():
-    ap = QApplication(sys.argv)
+    # ap = QApplication(sys.argv)
     q = mp.Queue()
     e = Example(q)
     process = mp.Process(target=runner, args=[q])
     process.start()
-    sys.exit(ap.exec_())
+    # sys.exit(ap.exec_())
 # class TorrentAddingDialog(QDialog):
 #     SELECTION_LABEL_FORMAT = 'Selected {} files({})'
 #
