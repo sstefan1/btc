@@ -50,16 +50,15 @@ class TorrentCreatingDialog(QDialog):
         return widget
 
     def _browse(self):
-        new_download_dir = QFileDialog.getExistingDirectory(self, 'Select download directory', self._torrent_info.file.path)
+        new_download_dir = QFileDialog.getExistingDirectory(self, 'Select download directory', self.path)
         if not new_download_dir:
             return
 
         self._download_dir = new_download_dir
         self._path_edit.setText(new_download_dir)
 
-    def __init__(self, parent: QWidget, filename: str, torrent_info: TorrentInfo):
+    def __init__(self, parent: QWidget, path):
         super().__init__(parent)
-        self._torrent_info = torrent_info
         # download_info = torrent_info.download_info
         vbox = QVBoxLayout(self)
 
@@ -80,7 +79,8 @@ class TorrentCreatingDialog(QDialog):
         vbox.addWidget(self._button_box)
 
         self.setFixedSize(450, 550)
-        self.setWindowTitle('Adding "{}"'.format(filename))
+        self.setWindowTitle('Create torrent')
+        self.path = path
 
     def _set_check_state_to_tree(self, item: QTreeWidgetItem, check_state: Qt.CheckState):
         for i in range(item.childCount()):
@@ -469,8 +469,10 @@ class Example(QMainWindow):
 
             # drugi i treci parametar za sad nek ostanu prazni stringovi
             # to su sada neke putanje, ali mi se ne svidja kako sam za sad to uradio.
-            download_path = 'C:/Users/mspet/Desktop/bit-torrent-master/samples/debian-8.3.0-i386-netinst.iso.torrent'
+            download_path = 'C:/Users/mspet/Desktop/bit-torrent-master/samples/debian-8.3.0-i386-netinst.iso'
             torrent_info = TorrentInfo.Torrent(info, '', download_path, tracker)
+
+            TorrentAddingDialog(self, tmp, torrent_info).exec()
 
             # ovu proveru cemo sami uraditi
             # if torrent_info.download_info.info_hash in self._torrent_to_item:
@@ -479,38 +481,10 @@ class Example(QMainWindow):
             # tvoja klasa nema polje self._error_happened
             # self._error_happened('Failed to add "{}"'.format(paths), err)
             pass
-
-        # nema za sad THREADA!!! :D
-        TorrentAddingDialog(self, tmp, torrent_info).exec()
 
     def create_torrent_files(self, path):
-        # posto je paths samo string, a ne lista stringova kao u resenom
-        # ovde ova for petlja ide slovo po slovo, a ne putanju po putanju.
-        # for path in paths:
-        try:
-            tmp = path.split('.')
-            # download se vrvt nece koristiti ali za sad ga stavljam da ne bi bacao exception u
-            # TorrentInfo.Torrent(...) konstruktoru u 320. liniji.
-            download_path = tmp[0] + '.' + tmp[1]
-            b_dict = self.parse_torrent_file(path)
-            tracker = TrackerInfo.Tracker(b_dict['announce'])
-            info = b_dict['info']
-
-            # drugi i treci parametar za sad nek ostanu prazni stringovi
-            # to su sada neke putanje, ali mi se ne svidja kako sam za sad to uradio.
-            download_path = 'C:/Users/mspet/btc/gui/add.gif'
-            torrent_info = TorrentInfo.Torrent(info, '', download_path, tracker)
-
-            # ovu proveru cemo sami uraditi
-            # if torrent_info.download_info.info_hash in self._torrent_to_item:
-                # raise ValueError('This torrent is already added')
-        except Exception as err:
-            # tvoja klasa nema polje self._error_happened
-            # self._error_happened('Failed to add "{}"'.format(paths), err)
-            pass
-
-        # nema za sad THREADA!!! :D
-        TorrentCreatingDialog(self, tmp, torrent_info).exec()
+        TorrentCreatingDialog(self, path).exec()
+        # TorrentCreatingDialog(self).exec()
 
     def _update_control_action_state(self):
         self._pause_action.setEnabled(False)
