@@ -5,7 +5,11 @@ from math import ceil
 class FileInfo:
     def __init__(self, path):
         self.path = path
-        self.size = os.path.getsize(path)
+        if os.path.exists(path):
+            self.size = os.path.getsize(path)
+        else:
+            self.size = 0
+
         self.offset = None
 
     def get_block_size(self, piece):
@@ -15,5 +19,5 @@ class FileInfo:
     def get_piece_size(self, piece_size):
         pass
 
-    def send_block(piece, block):
-        offset
+    # def send_block(piece, block):
+    #     offset
