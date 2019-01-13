@@ -84,3 +84,55 @@ def decode_bitfield(data):
     parts = struct.unpack('>Ib' + str(message_length - 1) + 's', data)
 
     return parts[2]
+
+def encode_request(index, begin, length):
+    """
+    Constructs the Request message.
+    The message is used to request a block of a piece.
+
+    The request size for each block is 2^14 bytes, except the final block
+    that might be smaller (since not all pieces might be evenly divided by the
+    request size).
+
+    :param index: zero based piece index
+    :param begin: zero based offset within a piece
+    :param length: requested length of data (default 2^14)
+    :return: encoded message
+    """
+    return struct.pack('>IbIII',
+                       13,
+                       PeerMessage.Request,
+                       index,
+                       begin,
+                       length)
+
+
+def decode_request(data):
+    """
+    Decodes request message
+
+    :param data: data to be decoded
+    :return: message
+    """
+    parts = struct.unpack('>IbIII', data)
+    return parts
+
+
+def encode_piece(index, begin, block):
+    """
+    Constructs the piece message.
+
+    :param index: zero based piece index
+    :param begin: zero based offset within a piece
+    :param block: block of data
+    :return: message
+    """
+
+    # piece message length without data is 9.
+    message_length = 9 + len(block)
+    return struct.pack('>IbII' + str(len(block)) + 's',
+                       message_length,
+                       PeerMessage.Piece,
+                       index,
+                       begin,
+                       block)
