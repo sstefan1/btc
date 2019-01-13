@@ -12,8 +12,9 @@ from PyQt5.QtWidgets import QWidget, QListWidget, QAbstractItemView, QLabel, QVB
     QListWidgetItem, QMainWindow, QApplication, QFileDialog, QMessageBox, QDialog, QDialogButtonBox, QTreeWidget, \
     QTreeWidgetItem, QHeaderView, QHBoxLayout, QPushButton, QLineEdit, QAction
 
-from torrent import TrackerInfo, TorrentInfo
 from math import floor, log
+
+from btc.torrent import TorrentInfo, TrackerInfo
 
 ICON_DIRECTORY = os.path.join(os.path.dirname(__file__), 'icons')
 
@@ -185,11 +186,11 @@ class TorrentAddingDialog(QDialog):
 
     def __init__(self, parent: QWidget, filename: str, torrent_info: TorrentInfo):
         super().__init__(parent)
+        self.parent = parent
+        #parent.torrent_added.emit(torrent_info)
         self._torrent_info = torrent_info
         # download_info = torrent_info.download_info
         vbox = QVBoxLayout(self)
-
-
         vbox.addWidget(QLabel('Download directory:'))
         vbox.addWidget(self._get_directory_browse_widget())
 
@@ -261,20 +262,24 @@ class TorrentAddingDialog(QDialog):
                 # selected_file_count, humanize_size(selected_size)))
 
     def submit_torrent(self):
-        # self._torrent_info.download_dir = self._download_dir
-        # self._control.last_download_dir = os.path.abspath(self._download_dir)
-        #
-        # file_paths = []
-        # for node, item in self._file_items:
-        #     if item.checkState(0) == Qt.Checked:
-        #         file_paths.append(node.path)
-        # if not self._torrent_info.download_info.single_file_mode:
-        #     self._torrent_info.download_info.select_files(file_paths, 'whitelist')
-        #
-        # self._control_thread.loop.call_soon_threadsafe(self._control.add, self._torrent_info)
-        #
-        # self.close()
+        """
+        self._torrent_info.download_dir = self._download_dir
+        self._control.last_download_dir = os.path.abspath(self._download_dir)
+
+        file_paths = []
+        for node, item in self._file_items:
+            if item.checkState(0) == Qt.Checked:
+                file_paths.append(node.path)
+        if not self._torrent_info.download_info.single_file_mode:
+            self._torrent_info.download_info.select_files(file_paths, 'whitelist')
+
+        self._control_thread.loop.call_soon_threadsafe(self._control.add, self._torrent_info)
+
+        self.close()
         pass
+        """
+        self.parent.torrent_added.emit(self._torrent_info)
+        self.close()
 
 
 UNIT_BASE = 2 ** 10
@@ -326,29 +331,45 @@ class TorrentListWidgetItem(QWidget):
     def __init__(self):
         super().__init__()
         vbox = QVBoxLayout(self)
+        # self.setMaximumHeight(100)
 
         self._name_label = QLabel()
         self._name_label.setFont(TorrentListWidgetItem._name_font)
         vbox.addWidget(self._name_label)
+        self._name_label.setText("First Torrent")
 
-        self._upper_status_label = QLabel()
-        self._upper_status_label.setFont(TorrentListWidgetItem._stats_font)
-        vbox.addWidget(self._upper_status_label)
+        self.upper_status_label = QLabel()
+        self.upper_status_label.setFont(TorrentListWidgetItem._stats_font)
+        vbox.addWidget(self.upper_status_label)
 
-        self._progress_bar = QProgressBar()
-        self._progress_bar.setFixedHeight(15)
-        self._progress_bar.setMaximum(1000)
-        vbox.addWidget(self._progress_bar)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setFixedHeight(15)
+        self.progress_bar.setMaximum(100)
+        vbox.addWidget(self.progress_bar)
+        self.progress_bar.setValue(50)
 
-        self._lower_status_label = QLabel()
-        self._lower_status_label.setFont(TorrentListWidgetItem._stats_font)
-        vbox.addWidget(self._lower_status_label)
+        self.lower_status_label = QLabel()
+        self.lower_status_label.setFont(TorrentListWidgetItem._stats_font)
+        vbox.addWidget(self.lower_status_label)
 
         self._state = None
         self._waiting_control_action = False
 
+    def set_name(self, name):
+        self._name_label.setText(name)
+
+    def set_lower_status(self, status):
+        self.lower_status_label.setText(status)
+
+    def set_upper_status(self, status):
+        self.upper_status_label.setText(status)
+
+    def set_progress(self, progress):
+        self.progress_bar.setValue(progress)
+
 
 class Example(QMainWindow):
+    torrent_added = pyqtSignal(TorrentInfo.Torrent)
     def __init__(self):
         super().__init__()
 
@@ -394,7 +415,8 @@ class Example(QMainWindow):
 
         self._list_widget = TorrentListWidget()
         self._list_widget.itemSelectionChanged.connect(self._update_control_action_state)
-        self._list_widget.files_dropped.connect(self.add_torrent_files)
+        #  self._list_widget.files_dropped.connect(self.add_torrent_files)
+        self.torrent_added.connect(self._add_torrent_item)
         self._torrent_to_item = {}  # type: Dict[bytes, QListWidgetItem]
 
         self.setCentralWidget(self._list_widget)
@@ -403,26 +425,18 @@ class Example(QMainWindow):
         self.setWindowTitle('Main window')
         self.show()
 
-    def _add_torrent_item(self):
-        # widget = TorrentListWidgetItem()
-        # widget.state = state
-        #
-        # item = QListWidgetItem()
-        # item.setIcon(file_icon if state.single_file_mode else directory_icon)
-        # item.setSizeHint(widget.sizeHint())
-        # item.setData(Qt.UserRole, state.info_hash)
-        #
-        # items_upper = 0
-        # for i in range(self._list_widget.count()):
-        #     prev_item = self._list_widget.item(i)
-        #     if self._list_widget.itemWidget(prev_item).state.suggested_name > state.suggested_name:
-        #         break
-        #     items_upper += 1
-        # self._list_widget.insertItem(items_upper, item)
-        #
-        # self._list_widget.setItemWidget(item, widget)
-        # self._torrent_to_item[state.info_hash] = item
-        pass
+    def _add_torrent_item(self, torrent_info):
+        # torrent_info parameter will be used later.
+        widget = TorrentListWidgetItem()
+        widget.set_name("FIRST TORRENT")
+        widget.set_progress(50)
+        widget.set_lower_status("LOWER STATUS")
+
+        item = QListWidgetItem()
+        item.setSizeHint(widget.sizeHint())
+
+        self._list_widget.addItem(item)
+        self._list_widget.setItemWidget(item, widget)
 
     def _control_action_triggered(self, action):
         for item in self._list_widget.selectedItems():

@@ -5,7 +5,7 @@ import urllib.parse
 from hashlib import sha1
 from math import ceil
 
-from torrent import FileInfo
+from btc.torrent import FileInfo
 
 
 def slash_escape(err):
