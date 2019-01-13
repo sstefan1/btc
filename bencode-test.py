@@ -58,7 +58,7 @@ def main():
     info = be_dict['info']
     torrent = TorrentInfo.Torrent(info, "N/A", file_path, tracker)
 
-    torrent.update(0, 123, 5555)
+    torrent.update(0, '01234567890123456789', 5555)
 
     peer = Peer.Peer(torrent, '192.168.1.4', 6666, b'01234567890123456789')
     peer.send_handshake()
