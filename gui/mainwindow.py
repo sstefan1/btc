@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import QWidget, QListWidget, QAbstractItemView, QLabel, QVB
 
 from math import floor, log
 
-from btc.torrent import TorrentInfo, TrackerInfo
+from torrent import TorrentInfo, TrackerInfo
 
 ICON_DIRECTORY = os.path.join(os.path.dirname(__file__), 'icons')
 
@@ -153,7 +153,7 @@ class TorrentCreatingDialog(QDialog):
         #
         # self._control_thread.loop.call_soon_threadsafe(self._control.add, self._torrent_info)
         #
-        # self.close()
+        self.close()
         pass
 
 
