@@ -10,6 +10,10 @@ class FileInfo:
         else:
             self.size = 0
 
+# <<<<<<< HEAD
+#
+# =======
+# >>>>>>> ae28bc8d43a96238f88d05f74e403dcb1fba7c84
         self.offset = None
 
     def get_block_size(self, piece):
