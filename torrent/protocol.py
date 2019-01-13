@@ -136,3 +136,60 @@ def encode_piece(index, begin, block):
                        index,
                        begin,
                        block)
+					   
+
+def decode_piece(data):
+    """
+    decodes the piece message.
+    :param data: message
+    :return: decoded message
+
+    NOTE: Piece message length without the block data is 9!
+    """
+    length = struct.unpack('>I', data[:4])[0]
+    parts = struct.unpack('>IbII' + str(length - 9) + 's', # see NOTE for explanation.
+                          data[:length+4])
+    return parts
+
+
+def encode_cancel(index, begin, length):
+    """
+    Constructs the cancel message.
+    Identical to Request, except for ID.
+
+    :param index: zero based piece index
+    :param begin: zero based offset within a piece
+    :param length: requested length of data
+    :return: message
+    """
+
+    # piece message length without data is 9.
+    return struct.pack('>IbIII',
+                       13,
+                       PeerMessage.Cancel,
+                       index,
+                       begin,
+                       length)
+
+
+def decode_cancel(data):
+    """
+    Decodes the cancel message.
+
+    :param data: message
+    :return: decoded message
+    """
+    parts = struct.unpack('>IbIII', data)
+    return parts
+
+
+def encode_have(index):
+    return struct.pack('>IbI',
+                       5,   # Message length
+                       PeerMessage.Have,
+                       index)
+
+
+def encode_have(data):
+    index = struct.unpack('>IbI', data)[2]
+    return index
