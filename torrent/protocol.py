@@ -33,12 +33,15 @@ class PeerMessage:
     Piece = 7
     Cancel = 8
     Port = 9
+    KeepAlive = None
     # Handshake and KeepAlive messages have no ID
-    REQUEST_SIZE = 2**14 # Block size
+
+
+REQUEST_SIZE = 2**14  # Block size
 
 
 def decode_no_payload(data):
-    return struct.unpack('>Ib', data)
+    return struct.unpack('>Ib', data[:5])
 
 
 def encode_keep_alive():
@@ -81,9 +84,12 @@ def encode_bitfield(data):
 
 def decode_bitfield(data):
     message_length = struct.unpack('>I', data[:4])[0]
-    parts = struct.unpack('>Ib' + str(message_length - 1) + 's', data)
+    parts = struct.unpack('>Ib' + str(message_length - 1) + 's', data[:4+message_length])
+    # remove bitfield message from recv buffer.
+    # data = data[4+message_length:]
 
-    return parts[2]
+    return parts[2], data[4+message_length:]
+
 
 def encode_request(index, begin, length):
     """
@@ -136,7 +142,7 @@ def encode_piece(index, begin, block):
                        index,
                        begin,
                        block)
-					   
+
 
 def decode_piece(data):
     """
@@ -147,7 +153,7 @@ def decode_piece(data):
     NOTE: Piece message length without the block data is 9!
     """
     length = struct.unpack('>I', data[:4])[0]
-    parts = struct.unpack('>IbII' + str(length - 9) + 's', # see NOTE for explanation.
+    parts = struct.unpack('>IbII' + str(length - 9) + 's',  # see NOTE for explanation.
                           data[:length+4])
     return parts
 
@@ -190,6 +196,8 @@ def encode_have(index):
                        index)
 
 
-def encode_have(data):
-    index = struct.unpack('>IbI', data)[2]
+def decode_have(data):
+    # Have message has fixed length. Length is always 5
+    # Plus 4 bytes for size, total size is 9.
+    index = struct.unpack('>IbI', data[:9])[2]
     return index

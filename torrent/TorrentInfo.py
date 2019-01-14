@@ -29,6 +29,7 @@ codecs.register_error('slash_escape', slash_escape)
 
 class Torrent:
     def __init__(self, info, location, file_path, tracker, block_size=16384):
+        self.info = info
         self.name = info['name']
         self.download_dir = location
         self.file = FileInfo.FileInfo(file_path)
@@ -58,3 +59,16 @@ class Torrent:
     def update(self, event, peerid, port):
         self.tracker.update(self, event, peerid, port)
 
+    def output_file(self):
+        return self.name
+
+    def pieces(self):
+        data = self.info['pieces']
+        pieces = []
+        offset = 0
+        length = len(data)
+
+        while offset < length:
+            pieces.append(data[offset:offset + 20])
+            offset += 20
+        return pieces
