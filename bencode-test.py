@@ -52,7 +52,7 @@ def parse_torrent_file(file):
 
 def main():
     file_path = r"C:\Users\stefan\Desktop\book.pdf"
-    create_torrent("http://192.168.1.9:6969/announce", file_path)
+    #create_torrent("http://192.168.1.9:6969/announce", file_path)
     be_dict = parse_torrent_file(file_path + ".torrent")
     tracker = TrackerInfo.Tracker(be_dict['announce'])
     info = be_dict['info']

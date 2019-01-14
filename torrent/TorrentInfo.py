@@ -72,3 +72,7 @@ class Torrent:
             pieces.append(data[offset:offset + 20])
             offset += 20
         return pieces
+
+    def num_pieces(self):
+        file_length = self.info['length']
+        return ceil(file_length / self.piece_size)

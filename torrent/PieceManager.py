@@ -2,6 +2,7 @@ import os
 import time
 import logging
 import math
+import bitstring
 
 from hashlib import sha1
 from collections import namedtuple
@@ -131,7 +132,7 @@ class PieceManager:
         self.max_pending_time = 300 * 1000  # 5 minutes
         self.missing_pieces = self._initiate_pieces()
         # self.total_pieces = len(torrent.pieces)
-        self.total_pieces = len(torrent.piece_hashes)
+        self.total_pieces = len(torrent.piece_hashes) // 20
         self.fd = os.open(self.torrent.output_file(),  os.O_RDWR | os.O_CREAT)
 
     def _initiate_pieces(self) -> [Piece]:
@@ -141,7 +142,8 @@ class PieceManager:
         """
         torrent = self.torrent
         pieces = []
-        total_pieces = len(torrent.piece_hashes)
+        # divide by 20, since sha1 hash is 20-bytes long
+        total_pieces = len(torrent.piece_hashes) // 20
         std_piece_blocks = math.ceil(torrent.piece_size / REQUEST_SIZE)
 
         for index, hash_value in enumerate(torrent.pieces()):
@@ -153,6 +155,10 @@ class PieceManager:
             if index < (total_pieces - 1):
                 blocks = [Block(index, offset * REQUEST_SIZE, REQUEST_SIZE)
                           for offset in range(std_piece_blocks)]
+
+                last = blocks[-1]
+                if last.offset + last.length > self.torrent.piece_size:
+                    last.length = self.torrent.piece_size - last.offset
             else:
                 last_length = torrent.info['length'] % torrent.piece_size
                 num_blocks = math.ceil(last_length / REQUEST_SIZE)
@@ -202,7 +208,11 @@ class PieceManager:
         """
         Adds a peer and the bitfield representing the pieces the peer has.
         """
-        self.peers[peer_id] = bitfield
+        if all(b == 0 for b in bitfield):
+            length = self.torrent.num_pieces()
+            self.peers[peer_id] = bitstring.BitArray(bin=length*'0')
+        else:
+            self.peers[peer_id] = bitfield
 
     def update_peer(self, peer_id, index: int):
         """
@@ -356,4 +366,12 @@ class PieceManager:
         """
         pos = piece.index * self.torrent.piece_size
         os.lseek(self.fd, pos, os.SEEK_SET)
-        os.write(self.fd, piece.data)
+        writen = os.write(self.fd, piece.data)
+        print("wrote piece length = " + str(writen))
+
+        if piece.index == 10:
+            size = os.path.getsize(self.torrent.output_file())
+            print("FILE SIZE: " + str(size))
+            os.close(self.fd)
+
+

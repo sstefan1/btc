@@ -41,6 +41,9 @@ REQUEST_SIZE = 2**14  # Block size
 
 
 def decode_no_payload(data):
+    # This decodes KeepAlive message. No ID and no payload.
+    if len(data) == 4:
+        return struct.unpack('>I', data)
     return struct.unpack('>Ib', data[:5])
 
 
@@ -152,9 +155,13 @@ def decode_piece(data):
 
     NOTE: Piece message length without the block data is 9!
     """
-    length = struct.unpack('>I', data[:4])[0]
-    parts = struct.unpack('>IbII' + str(length - 9) + 's',  # see NOTE for explanation.
-                          data[:length+4])
+    try:
+        length = struct.unpack('>I', data[:4])[0]
+        parts = struct.unpack('>IbII' + str(length - 9) + 's',  # see NOTE for explanation.
+                              data[:length+4])
+    except:
+        print('error in decode_piece')
+        return
     return parts
 
 
