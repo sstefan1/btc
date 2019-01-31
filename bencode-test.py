@@ -51,8 +51,10 @@ def parse_torrent_file(file):
 
 
 def main():
-    file_path = r"C:\Users\stefan\Desktop\book.pdf"
-    #create_torrent("http://192.168.1.9:6969/announce", file_path)
+    # Listen port will be 5555
+    # file_path = r"C:\Users\stefan\Desktop\lion.png"
+    file_path = r"/Users/sstefan/Desktop/lion.png"
+    # create_torrent("http://192.168.1.12:6969/announce", file_path)
     be_dict = parse_torrent_file(file_path + ".torrent")
     tracker = TrackerInfo.Tracker(be_dict['announce'])
     info = be_dict['info']
@@ -60,7 +62,10 @@ def main():
 
     torrent.update(0, '01234567890123456789', 5555)
 
-    peer = Peer.Peer(torrent, '192.168.1.4', 6666, b'01234567890123456789')
+    peer = Peer.Peer(torrent, '192.168.1.4', 5555, b'01234567890123456789')
+
+    # Send handshake sends the first message
+    # and receives rest of the messages.
     peer.send_handshake()
 
 

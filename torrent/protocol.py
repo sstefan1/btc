@@ -159,7 +159,7 @@ def decode_piece(data):
         length = struct.unpack('>I', data[:4])[0]
         parts = struct.unpack('>IbII' + str(length - 9) + 's',  # see NOTE for explanation.
                               data[:length+4])
-    except:
+    except Exception as e:
         print('error in decode_piece')
         return
     return parts

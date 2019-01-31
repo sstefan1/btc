@@ -138,6 +138,7 @@ class TorrentCreatingDialog(QDialog):
         #
         # self._control_thread.loop.call_soon_threadsafe(self._control.add, self._torrent_info)
         #
+
         self.close()
         pass
 

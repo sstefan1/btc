@@ -664,7 +664,7 @@ class Example(QMainWindow):
 
         self._remove_action = toolbar.addAction(load_icon('remove'), 'Remove')
         self._remove_action.setEnabled(False)
-        self._remove_action.triggered.connect(partial(self._control_action_triggered))
+        self._remove_action.triggered.connect(partial(self._remove_torrent_item))
 
         self._about_action = toolbar.addAction(load_icon('about'), 'About')
         self._about_action.triggered.connect(self._show_about)
@@ -697,8 +697,8 @@ class Example(QMainWindow):
     def _control_action_triggered(self, action):
         for item in self._list_widget.selectedItems():
             widget = self._list_widget.itemWidget(item)
-            if widget.waiting_control_action:
-                continue
+            #if widget.waiting_control_action:
+                #continue
 
             info_hash = item.data(Qt.UserRole)
             widget.waiting_control_action = True
@@ -712,6 +712,14 @@ class Example(QMainWindow):
     def _create_torrents_triggered(self):
         paths, _ = QFileDialog.getOpenFileName(self, 'Add file', '','All files (*)')
         self.create_torrent_files(paths)
+
+    def _remove_torrent_item(self):
+        listItems = self._list_widget.selectedItems()
+        if not listItems: return
+        for item in listItems:
+            self._list_widget.takeItem(self._list_widget.row(item))
+
+        self._update_control_action_state()
 
     def _show_about(self):
         pass
@@ -743,6 +751,7 @@ class Example(QMainWindow):
             torrent_info = TorrentInfo.Torrent(info, '', download_path, tracker)
 
             dialog.TorrentAddingDialog(self, tmp, torrent_info).exec()
+            self._update_control_action_state()
 
             # ovu proveru cemo sami uraditi
             # if torrent_info.download_info.info_hash in self._torrent_to_item:
@@ -762,13 +771,7 @@ class Example(QMainWindow):
         self._remove_action.setEnabled(False)
         for item in self._list_widget.selectedItems():
             widget = self._list_widget.itemWidget(item)
-            if widget.waiting_control_action:
-                continue
 
-            if widget.state.paused:
-                self._resume_action.setEnabled(True)
-            else:
-                self._pause_action.setEnabled(True)
             self._remove_action.setEnabled(True)
 
 
