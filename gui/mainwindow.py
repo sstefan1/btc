@@ -1,12 +1,16 @@
 import sys
 import os
 import bencode
+import multiprocessing as mp
+import time
+
+from threading import Thread
 
 from functools import partial, partialmethod
 from PyQt5.QtWidgets import QMainWindow, QTextEdit, QAction, QApplication
 from PyQt5.QtGui import QIcon, QFont, QDropEvent
 from typing import Dict, List, Optional
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal
 
 from PyQt5.QtWidgets import QWidget, QListWidget, QAbstractItemView, QLabel, QVBoxLayout, QProgressBar, \
     QListWidgetItem, QMainWindow, QApplication, QFileDialog, QMessageBox, QDialog, QDialogButtonBox, QTreeWidget, \
@@ -14,12 +18,12 @@ from PyQt5.QtWidgets import QWidget, QListWidget, QAbstractItemView, QLabel, QVB
 
 # <<<<<<< HEAD
 # =======
-from gui import dialog
+from gui import dialog, UpdaterThread
 
 # >>>>>>> ae28bc8d43a96238f88d05f74e403dcb1fba7c84
 from math import floor, log
 
-from torrent import TorrentInfo, TrackerInfo
+from torrent import TorrentInfo, TrackerInfo, Peer, PieceManager, utils
 
 ICON_DIRECTORY = os.path.join(os.path.dirname(__file__), 'icons')
 
@@ -584,7 +588,7 @@ class TorrentListWidgetItem(QWidget):
     _stats_font = QFont()
     _stats_font.setPointSize(10)
 
-    def __init__(self):
+    def __init__(self, queue: mp.Queue, file_size):
         super().__init__()
         vbox = QVBoxLayout(self)
         # self.setMaximumHeight(100)
@@ -601,18 +605,27 @@ class TorrentListWidgetItem(QWidget):
         self.progress_bar = QProgressBar()
         self.progress_bar.setFixedHeight(15)
         self.progress_bar.setMaximum(100)
+        self.updater_thread = UpdaterThread.UpdaterThread(queue=queue, file_size=file_size)
+        self.updater_thread.progress_update.connect(self.update_progress)
         vbox.addWidget(self.progress_bar)
         self.progress_bar.setValue(50)
 
         self.lower_status_label = QLabel()
         self.lower_status_label.setFont(TorrentListWidgetItem._stats_font)
+
         vbox.addWidget(self.lower_status_label)
 
         self._state = None
         self._waiting_control_action = False
 
+    def update_progress(self, progress):
+        self.progress_bar.setValue(progress)
+
     def set_name(self, name):
         self._name_label.setText(name)
+
+    def get_name(self):
+        return self._name_label.text()
 
     def set_lower_status(self, status):
         self.lower_status_label.setText(status)
@@ -675,30 +688,52 @@ class Example(QMainWindow):
         self.torrent_added.connect(self._add_torrent_item)
         self._torrent_to_item = {}  # type: Dict[bytes, QListWidgetItem]
 
+        # adds name of added torrent.
+        self.added_torrents = []
+
         self.setCentralWidget(self._list_widget)
 
-        self.setGeometry(300, 300, 350, 250)
+        self.setGeometry(300, 300, 500, 300)
         self.setWindowTitle('Main window')
         self.show()
 
     def _add_torrent_item(self, torrent_info):
-        # torrent_info parameter will be used later.
-        widget = TorrentListWidgetItem()
-        widget.set_name("FIRST TORRENT")
-        widget.set_progress(50)
-        widget.set_lower_status("LOWER STATUS")
+        queue = mp.Queue()
+        widget = TorrentListWidgetItem(queue, torrent_info.info['length'])
+        widget.set_name(torrent_info.name)
+        widget.set_lower_status('Announcing...')
+        widget.progress_bar.setValue(0)
 
         item = QListWidgetItem()
         item.setSizeHint(widget.sizeHint())
 
+        if len(self.added_torrents) == 0:
+            self.added_torrents.append(torrent_info.name)
+        else:
+            if torrent_info.name in self.added_torrents:
+                return
+            self.added_torrents.append(torrent_info.name)
+
         self._list_widget.addItem(item)
         self._list_widget.setItemWidget(item, widget)
+
+
+        # Announce.
+        torrent_info.update(0, '01234567890123456789', 5555)
+
+        peer = Peer.Peer(torrent_info, '192.168.1.10', 5555, b'01234567890123456789')
+        process = mp.Process(target=peer.send_handshake, args=[queue])
+
+        widget.updater_thread.start()
+
+        # Starts downloader/uploader process.
+        process.start()
 
     def _control_action_triggered(self, action):
         for item in self._list_widget.selectedItems():
             widget = self._list_widget.itemWidget(item)
-            #if widget.waiting_control_action:
-                #continue
+            if widget.waiting_control_action:
+                continue
 
             info_hash = item.data(Qt.UserRole)
             widget.waiting_control_action = True
@@ -717,7 +752,9 @@ class Example(QMainWindow):
         listItems = self._list_widget.selectedItems()
         if not listItems: return
         for item in listItems:
-            self._list_widget.takeItem(self._list_widget.row(item))
+            name = self._list_widget.itemWidget(item).get_name()
+            if name in self.added_torrents:
+                self._list_widget.takeItem(self._list_widget.row(item))
 
         self._update_control_action_state()
 
@@ -733,32 +770,31 @@ class Example(QMainWindow):
             return be_data
 
     def add_torrent_files(self, path):
-        # posto je paths samo string, a ne lista stringova kao u resenom
-        # ovde ova for petlja ide slovo po slovo, a ne putanju po putanju.
-        # for path in paths:
         try:
-            tmp = path.split('.')
             # download se vrvt nece koristiti ali za sad ga stavljam da ne bi bacao exception u
             # TorrentInfo.Torrent(...) konstruktoru u 320. liniji.
-            download_path = tmp[0] + '.' + tmp[1]
+
             b_dict = self.parse_torrent_file(path)
             tracker = TrackerInfo.Tracker(b_dict['announce'])
             info = b_dict['info']
 
             # drugi i treci parametar za sad nek ostanu prazni stringovi
             # to su sada neke putanje, ali mi se ne svidja kako sam za sad to uradio.
-            download_path = 'C:/Users/mspet/Desktop/bit-torrent-master/samples/debian-8.3.0-i386-netinst.iso'
-            torrent_info = TorrentInfo.Torrent(info, '', download_path, tracker)
 
-            dialog.TorrentAddingDialog(self, tmp, torrent_info).exec()
+            default_path = path.replace(info['name'] + '.torrent', '')
+
+            torrent_info = TorrentInfo.Torrent(info, '', default_path, tracker)
+
+            download_path, ok = dialog.TorrentAddingDialog.submit_torrent(self, torrent_info)
+            if ok:
+                torrent_info.download_dir = download_path
+            else:
+                return
+
             self._update_control_action_state()
 
-            # ovu proveru cemo sami uraditi
-            # if torrent_info.download_info.info_hash in self._torrent_to_item:
-                # raise ValueError('This torrent is already added')
+            self._add_torrent_item(torrent_info)
         except Exception as err:
-            # tvoja klasa nema polje self._error_happened
-            # self._error_happened('Failed to add "{}"'.format(paths), err)
             pass
 
     def create_torrent_files(self, path):
@@ -772,7 +808,8 @@ class Example(QMainWindow):
         for item in self._list_widget.selectedItems():
             widget = self._list_widget.itemWidget(item)
 
-            self._remove_action.setEnabled(True)
+            if self._add_torrents_triggered:
+                self._remove_action.setEnabled(True)
 
 
 if __name__ == '__main__':

@@ -122,7 +122,7 @@ class PieceManager:
     The strategy on which piece to request is made as simple as possible in
     this implementation.
     """
-    def __init__(self, torrent):
+    def __init__(self, torrent, output_location):
         self.torrent = torrent
         self.peers = {}
         self.pending_blocks = []
@@ -134,7 +134,9 @@ class PieceManager:
         # self.total_pieces = len(torrent.pieces)
         self.total_pieces = len(torrent.piece_hashes) // 20
         #self.fd = os.open(self.torrent.output_file(),  os.O_RDWR | os.O_CREAT)
-        self.fd = open(self.torrent.output_file(), 'wb+')
+
+        output_path = output_location + self.torrent.output_file()
+        self.fd = open(output_path, 'wb+')
         self.fd.truncate(0)
         # self.fd.truncate
 

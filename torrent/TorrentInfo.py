@@ -59,8 +59,8 @@ class Torrent:
     def update(self, event, peerid, port):
         self.tracker.update(self, event, peerid, port)
 
-    def output_file(self):
-        return self.name
+    def download_path(self):
+        return self.download_dir + '/' + self.name
 
     def pieces(self):
         data = self.info['pieces']

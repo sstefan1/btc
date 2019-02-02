@@ -12,8 +12,11 @@ from PyQt5.QtWidgets import QWidget, QListWidget, QAbstractItemView, QLabel, QVB
     QListWidgetItem, QMainWindow, QApplication, QFileDialog, QMessageBox, QDialog, QDialogButtonBox, QTreeWidget, \
     QTreeWidgetItem, QHeaderView, QHBoxLayout, QPushButton, QLineEdit, QAction
 
-from torrent import TrackerInfo, TorrentInfo
+from torrent import TrackerInfo, TorrentInfo, Peer, utils
+import multiprocessing as mp
+
 from math import floor, log
+
 
 
 class TorrentCreatingDialog(QDialog):
@@ -126,21 +129,10 @@ class TorrentCreatingDialog(QDialog):
                 # selected_file_count, humanize_size(selected_size)))
 
     def submit_torrent(self):
-        # self._torrent_info.download_dir = self._download_dir
-        # self._control.last_download_dir = os.path.abspath(self._download_dir)
-        #
-        # file_paths = []
-        # for node, item in self._file_items:
-        #     if item.checkState(0) == Qt.Checked:
-        #         file_paths.append(node.path)
-        # if not self._torrent_info.download_info.single_file_mode:
-        #     self._torrent_info.download_info.select_files(file_paths, 'whitelist')
-        #
-        # self._control_thread.loop.call_soon_threadsafe(self._control.add, self._torrent_info)
-        #
+        path = self._path_edit.text()
+        utils.create_torrent(self._tracker_edit.text(), path)
 
         self.close()
-        pass
 
 
 class TorrentAddingDialog(QDialog):
@@ -151,8 +143,8 @@ class TorrentAddingDialog(QDialog):
         hbox = QHBoxLayout(widget)
         hbox.setContentsMargins(0, 0, 0, 0)
 
-        self._path_edit = QLineEdit(self._torrent_info.file.path)
-        self._path_edit.setReadOnly(True)
+        self._path_edit = QLineEdit(self.download_path)
+        self._path_edit.setReadOnly(False)
         hbox.addWidget(self._path_edit, 4)
 
         browse_button = QPushButton('Browse...')
@@ -167,8 +159,9 @@ class TorrentAddingDialog(QDialog):
         if not new_download_dir:
             return
 
-        self._download_dir = new_download_dir
+        self.download_path = new_download_dir
         self._path_edit.setText(new_download_dir)
+        self.torrent_path = new_download_dir
 
     def __init__(self, parent: QWidget, filename: str, torrent_info: TorrentInfo):
         super().__init__(parent)
@@ -183,12 +176,15 @@ class TorrentAddingDialog(QDialog):
         self._button_box = QDialogButtonBox(self)
         self._button_box.setOrientation(Qt.Horizontal)
         self._button_box.setStandardButtons(QDialogButtonBox.Cancel | QDialogButtonBox.Ok)
-        self._button_box.button(QDialogButtonBox.Ok).clicked.connect(self.submit_torrent)
-        self._button_box.button(QDialogButtonBox.Cancel).clicked.connect(self.close)
+        self._button_box.button(QDialogButtonBox.Ok).clicked.connect(self.accept)
+        self._button_box.button(QDialogButtonBox.Cancel).clicked.connect(self.reject)
         vbox.addWidget(self._button_box)
 
-        self.setFixedSize(400, 100)
-        self.setWindowTitle('Adding "{}"'.format(filename))
+        self.torrent_path = torrent_info.name
+        self.download_path = torrent_info.download_dir
+
+        self.setFixedSize(500, 200)
+        self.setWindowTitle('Adding "{}"'.format(self.torrent_path))
 
     def _set_check_state_to_tree(self, item: QTreeWidgetItem, check_state: Qt.CheckState):
         for i in range(item.childCount()):
@@ -247,22 +243,9 @@ class TorrentAddingDialog(QDialog):
             # self._selection_label.setText(TorrentAddingDialog.SELECTION_LABEL_FORMAT.format(
                 # selected_file_count, humanize_size(selected_size)))
 
-    def submit_torrent(self):
-        """
-        self._torrent_info.download_dir = self._download_dir
-        self._control.last_download_dir = os.path.abspath(self._download_dir)
-
-        file_paths = []
-        for node, item in self._file_items:
-            if item.checkState(0) == Qt.Checked:
-                file_paths.append(node.path)
-        if not self._torrent_info.download_info.single_file_mode:
-            self._torrent_info.download_info.select_files(file_paths, 'whitelist')
-
-        self._control_thread.loop.call_soon_threadsafe(self._control.add, self._torrent_info)
-
-        self.close()
-        pass
-        """
-        self.parent.torrent_added.emit(self._torrent_info)
-        self.close()
+    @staticmethod
+    def submit_torrent(parent: QWidget, torrent_info: TorrentInfo):
+        dialog = TorrentAddingDialog(parent, torrent_info)
+        result = dialog.exec_()
+        download_path = dialog.download_path
+        return download_path, result == QDialog.Accepted

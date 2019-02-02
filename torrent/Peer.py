@@ -6,7 +6,8 @@ from torrent import PieceManager
 class Peer:
     def __init__(self, torrent, host, port, peer_id):
         self.torrent = torrent
-        self.piece_manager = PieceManager.PieceManager(torrent)
+        # self.piece_manager = PieceManager.PieceManager(torrent)
+        self.piece_manager = None
 
         #  ip address.
         # self.host = host
@@ -30,7 +31,7 @@ class Peer:
         self.peer_socket = None
         self.peers_sockets = {}   # peer dictionary. key=ID, value=Socket
 
-    def send_handshake(self):
+    def send_handshake(self, queue):
         """
         Sends Hendshake message. Since peer should immediately respond
         with his own handshake message, response is recieved from the
@@ -117,6 +118,7 @@ class Peer:
         self.download()
 
     def download(self):
+        self.piece_manager = PieceManager.PieceManager(torrent=self.torrent)
         self.send_interested()
         self.set_nonblocking()
 
