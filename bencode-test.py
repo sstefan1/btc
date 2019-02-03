@@ -3,6 +3,7 @@ import hashlib
 import os
 
 from torrent import TrackerInfo, TorrentInfo, Peer
+from tracker import tracker
 
 
 def create_torrent(tracker, file):
@@ -69,5 +70,11 @@ def main():
     peer.send_handshake()
 
 
+def main_tracker():
+    t = tracker.Tracker()
+    t.run()
+
+
 if __name__ == "__main__":
-    main()
+    # main()
+    main_tracker()
