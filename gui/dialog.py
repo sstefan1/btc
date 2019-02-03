@@ -163,12 +163,13 @@ class TorrentAddingDialog(QDialog):
         self._path_edit.setText(new_download_dir)
         self.torrent_path = new_download_dir
 
-    def __init__(self, parent: QWidget, filename: str, torrent_info: TorrentInfo):
+    def __init__(self, parent: QWidget, torrent_info: TorrentInfo):
         super().__init__(parent)
         self.parent = parent
-        #parent.torrent_added.emit(torrent_info)
+
         self._torrent_info = torrent_info
-        # download_info = torrent_info.download_info
+        self.download_path = torrent_info.download_dir
+
         vbox = QVBoxLayout(self)
         vbox.addWidget(QLabel('Download directory:'))
         vbox.addWidget(self._get_directory_browse_widget())
@@ -181,7 +182,6 @@ class TorrentAddingDialog(QDialog):
         vbox.addWidget(self._button_box)
 
         self.torrent_path = torrent_info.name
-        self.download_path = torrent_info.download_dir
 
         self.setFixedSize(500, 200)
         self.setWindowTitle('Adding "{}"'.format(self.torrent_path))

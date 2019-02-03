@@ -697,6 +697,9 @@ class Example(QMainWindow):
         self.setWindowTitle('Main window')
         self.show()
 
+#    def closeEvent(self, *args, **kwargs):
+
+
     def _add_torrent_item(self, torrent_info):
         queue = mp.Queue()
         widget = TorrentListWidgetItem(queue, torrent_info.info['length'])
@@ -755,6 +758,7 @@ class Example(QMainWindow):
             name = self._list_widget.itemWidget(item).get_name()
             if name in self.added_torrents:
                 self._list_widget.takeItem(self._list_widget.row(item))
+                self.added_torrents.remove(name)
 
         self._update_control_action_state()
 

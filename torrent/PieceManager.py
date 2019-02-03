@@ -122,7 +122,8 @@ class PieceManager:
     The strategy on which piece to request is made as simple as possible in
     this implementation.
     """
-    def __init__(self, torrent, output_location):
+    # def __init__(self, torrent, output_location):
+    def __init__(self, torrent):
         self.torrent = torrent
         self.peers = {}
         self.pending_blocks = []
@@ -135,8 +136,9 @@ class PieceManager:
         self.total_pieces = len(torrent.piece_hashes) // 20
         #self.fd = os.open(self.torrent.output_file(),  os.O_RDWR | os.O_CREAT)
 
-        output_path = output_location + self.torrent.output_file()
-        self.fd = open(output_path, 'wb+')
+        # output_path = output_location + self.torrent.output_file()
+        self.download_path = torrent.download_path()
+        self.fd = open(self.download_path, 'wb+')
         self.fd.truncate(0)
         # self.fd.truncate
 
@@ -396,9 +398,13 @@ class PieceManager:
         print("wrote piece length = " + str(writen))
 
         if piece.index == self.total_pieces - 1:
-            size = os.path.getsize(self.torrent.output_file())
+            size = os.path.getsize(self.torrent.download_path())
             print("FILE SIZE: " + str(size))
-            # os.close(self.fd)
+            #self.finished = True
             self.fd.close()
 
-
+    def read(self, piece, offset, length):
+        pos = piece * self.torrent.piece_size + offset
+        self.fd.seek(pos, os.SEEK_SET)
+        data = self.fd.read(len)
+        return data

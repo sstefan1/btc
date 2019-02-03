@@ -44,6 +44,8 @@ def decode_no_payload(data):
     # This decodes KeepAlive message. No ID and no payload.
     if len(data) == 4:
         return struct.unpack('>I', data)
+    if len(data) < 4:
+        raise Exception
     return struct.unpack('>Ib', data[:5])
 
 

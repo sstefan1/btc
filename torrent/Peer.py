@@ -90,35 +90,60 @@ class Peer:
 
         # Get have messages from all the remaining peers.
         # Discard those which are not seeders.
-        for p_id, p_sock in self.peers_sockets.items():
-            data = self.socket_recv(protocol.REQUEST_SIZE, p_sock)
-            while data:
-                message = protocol.decode_no_payload(data)
-                m_type = message[1]
-                length = message[0]
 
-                if m_type == protocol.PeerMessage.BitField:
-                    bitfield, _ = protocol.decode_bitfield(data)
-                    self.piece_manager.add_peer(p_id, bitfield)
-                elif m_type == protocol.PeerMessage.Have:
-                    index = protocol.decode_have(data)
-                    self.piece_manager.update_peer(p_id, index)
+        self.piece_manager = PieceManager.PieceManager(torrent=self.torrent)
 
-                data = data[4 + length:]
+        if not self.peers_sockets.items():
+            print('peers not responding')
+            return
 
-            bitfield = self.piece_manager.peers[p_id]
-            if all(b == 1 for b in bitfield):
-                continue
-            else:
-                pass
-                # Not seeder. Discard.
-                # del self.peers_sockets[p_id]
+        success = False
+
+        while not success:
+            for p_id, p_sock in self.peers_sockets.items():
+                data = self.socket_recv(protocol.REQUEST_SIZE, p_sock)
+                while data:
+                    if len(data) < 4:
+                        data = None
+                        print('insufficient data')
+                        continue
+
+                    message = protocol.decode_no_payload(data)
+                    length = message[0]
+                    if length == 0:
+                        # KeepAlive
+                        print('keep-alive')
+                        data = data[:4]
+                        continue
+
+                    m_type = message[1]
+
+                    if message[0] + 4 > len(data):
+                        data += self.socket_recv(protocol.REQUEST_SIZE, p_sock)
+                        continue
+
+                    if m_type == protocol.PeerMessage.BitField:
+                        bitfield, _ = protocol.decode_bitfield(data)
+                        self.piece_manager.add_peer(p_id, bitfield)
+                    elif m_type == protocol.PeerMessage.Have:
+                        index = protocol.decode_have(data)
+                        self.piece_manager.update_peer(p_id, index)
+
+                    data = data[4 + length:]
+
+                bitfield = self.piece_manager.peers[p_id]
+                if all(b == 1 for b in bitfield):
+                    success = True
+                    continue
+                else:
+                    pass
+                    # Not seeder. Discard.
+                    # del self.peers_sockets[p_id]
 
             # Start downloading
-        self.download()
+        self.download(queue)
 
-    def download(self):
-        self.piece_manager = PieceManager.PieceManager(torrent=self.torrent)
+    def download(self, queue):
         self.send_interested()
         self.set_nonblocking()
 
@@ -126,6 +151,9 @@ class Peer:
         data = b''
         i = 0
         while True:
+            if self.piece_manager.fd.closed:
+                return
+                # self.start_seeding()
             if self.chocked:
                 # self.send_interested()
                 sockets = self.dict_to_list(self.peers_sockets)
@@ -173,7 +201,8 @@ class Peer:
                 message_type = message[1]
 
                 # if message_type == protocol.PeerMessage.Piece and message[0] > len(data):
-                if message_type == protocol.PeerMessage.Piece and ((message[0] > len(data)) or (message[0] < len(data) and message[0] + 4 < len(data))):
+                # if message_type == protocol.PeerMessage.Piece and ((message[0] > len(data)) or (message[0] < len(data) and message[0] + 4 < len(data))):
+                if message_type == protocol.PeerMessage.Piece and message[0] + 4 > len(data):
                     """ actually any message can have incomplete message."""
                     # Piece messege not complete. Recieve remaining data
                     # data += self.peer_socket.recv(message[0] - len(data) + 4)
@@ -213,6 +242,7 @@ class Peer:
                         continue
                     piece_message = protocol.decode_piece(data)
                     # self.my_state.remove('pending_request')
+                    queue.put(message[0])
                     self.piece_manager.block_received(peer_id=self.remote_id,
                                                       piece_index=piece_message[2],
                                                       block_offset=piece_message[3],
@@ -229,6 +259,74 @@ class Peer:
                 #     request_piece = True
                 # if len(self.piece_manager.missing_pieces) == 0:
                     # return
+
+    """
+    For now this client only supports seeding complete file
+    """
+    def start_seeding(self):
+        host = ''
+        port = self.port
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+            server.bind((host, port))
+            # max 5 queued connections
+            server.listen(5)
+            server.setblocking(0)
+
+            read_list = [server]
+            peer_read_list = []
+
+            while True:
+                readable, _, _ = select.select(read_list, [], [])
+                for s in readable:
+                    peer_socket, address = s.accept()
+                    peer_read_list.append(s)
+                    print('connected to: ' + address)
+
+                readable, _, _ = select.select(peer_read_list, [], [])
+
+                data = None
+                for s in readable:
+                    data = s.recv(protocol.REQUEST_SIZE)
+
+                    if len(data) == 68:
+                        self.handshake_response(s)
+                        continue
+
+                    message = protocol.decode_no_payload(data)
+
+                    """
+                    If interested is received, immediately send unchoke
+                    and have for whole file.
+                    This client doesn't send bitfield messages
+                    """
+                    if message[0] == protocol.PeerMessage.Interested:
+                        unchoke = protocol.encode_unchoke()
+                        self.socket_send(s, unchoke)
+                        for i in range(self.piece_manager.total_pieces):
+                            have = protocol.encode_have(i)
+                            self.socket_send(s, have)
+
+                    elif message[0] == protocol.PeerMessage.Request:
+                        request = protocol.decode_request(data)
+                        block = self.piece_manager.read(request[0], request[1], request[2])
+                        piece_msg = protocol.encode_piece(request[0], request[1], request[2])
+                        self.socket_send(s, piece_msg)
+
+
+
+
+    def handshake_response(self, socket):
+        name_length = bytes([19])
+        protocol_name = b'BitTorrent protocol'
+        reserved_flags = b'\0' * 8
+
+        info_hash = self.torrent.urlInfoHash
+        peer_id = self.peer_id
+
+        handshake_msg = name_length + protocol_name + reserved_flags + info_hash + peer_id
+
+        # socket.send(handshake_msg)
+        self.socket_send(socket, handshake_msg)
 
     def _request_piece(self, p_sock):
         # if 'choked' not in self.my_state and 'interested' in self.my_state and pending
