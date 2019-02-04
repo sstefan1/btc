@@ -1,28 +1,18 @@
 import sys
 import os
-import bencode
 import multiprocessing as mp
-import time
-
-from threading import Thread
 
 from functools import partial, partialmethod
 from PyQt5.QtWidgets import QMainWindow, QTextEdit, QAction, QApplication
 from PyQt5.QtGui import QIcon, QFont, QDropEvent
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from PyQt5.QtCore import Qt, pyqtSignal
 
 from PyQt5.QtWidgets import QWidget, QListWidget, QAbstractItemView, QLabel, QVBoxLayout, QProgressBar, \
-    QListWidgetItem, QMainWindow, QApplication, QFileDialog, QMessageBox, QDialog, QDialogButtonBox, QTreeWidget, \
-    QTreeWidgetItem, QHeaderView, QHBoxLayout, QPushButton, QLineEdit, QAction
+    QListWidgetItem, QMainWindow, QApplication, QFileDialog, QAction
 
-# <<<<<<< HEAD
-# =======
 from gui import dialog, UpdaterThread
-
-# >>>>>>> ae28bc8d43a96238f88d05f74e403dcb1fba7c84
 from math import floor, log
-
 from torrent import TorrentInfo, TrackerInfo, Peer, PieceManager, utils
 
 ICON_DIRECTORY = os.path.join(os.path.dirname(__file__), 'icons')
@@ -38,507 +28,6 @@ directory_icon = load_icon('directory')
 
 def get_directory(directory: Optional[str]):
     return directory if directory is not None else os.getcwd()
-
-
-# <<<<<<< HEAD
-# class TorrentCreatingDialog(QDialog):
-#     SELECTION_LABEL_FORMAT = 'Selected {} files ({})'
-#
-#     def _get_directory_browse_widget(self):
-#         widget = QWidget()
-#         hbox = QHBoxLayout(widget)
-#         hbox.setContentsMargins(0, 0, 0, 0)
-#
-#         self._path_edit = QLineEdit(self)
-#         self._path_edit.setReadOnly(True)
-#         hbox.addWidget(self._path_edit, 4)
-#
-#         browse_button = QPushButton('Browse...')
-#         browse_button.clicked.connect(self._browse)
-#         hbox.addWidget(browse_button, 1)
-#
-#         widget.setLayout(hbox)
-#         return widget
-#
-#     def _browse(self):
-#         new_download_dir = QFileDialog.getExistingDirectory(self, 'Select download directory', self.path)
-#         if not new_download_dir:
-#             return
-#
-#         self._download_dir = new_download_dir
-#         self._path_edit.setText(new_download_dir)
-#
-#     def __init__(self, parent: QWidget, path):
-#         super().__init__(parent)
-#         # download_info = torrent_info.download_info
-#         vbox = QVBoxLayout(self)
-#
-#
-#         vbox.addWidget(QLabel('Path to file:'))
-#         vbox.addWidget(self._get_directory_browse_widget())
-#
-#         vbox.addWidget(QLabel('Tracker:'))
-#         self._path_edit = QLineEdit(self)
-#         self._path_edit.setReadOnly(False)
-#         vbox.addWidget(self._path_edit, 4)
-#
-#         self._button_box = QDialogButtonBox(self)
-#         self._button_box.setOrientation(Qt.Horizontal)
-#         self._button_box.setStandardButtons(QDialogButtonBox.Cancel | QDialogButtonBox.Ok)
-#         self._button_box.button(QDialogButtonBox.Ok).clicked.connect(self.submit_torrent)
-#         self._button_box.button(QDialogButtonBox.Cancel).clicked.connect(self.close)
-#         vbox.addWidget(self._button_box)
-#
-#         self.setFixedSize(450, 550)
-#         self.setWindowTitle('Create torrent')
-#         self.path = path
-#
-#     def _set_check_state_to_tree(self, item: QTreeWidgetItem, check_state: Qt.CheckState):
-#         for i in range(item.childCount()):
-#             child = item.child(i)
-#             child.setCheckState(0, check_state)
-#             self._set_check_state_to_tree(child, check_state)
-#
-#     def _update_checkboxes(self, item: QTreeWidgetItem, column: int):
-#         if column != 0:
-#             return
-#
-#         new_check_state = item.checkState(0)
-#         self._set_check_state_to_tree(item, new_check_state)
-#
-#         while True:
-#             item = item.parent()
-#             if item is None:
-#                 break
-#
-#             has_checked_children = False
-#             has_partially_checked_children = False
-#             has_unchecked_children = False
-#             for i in range(item.childCount()):
-#                 state = item.child(i).checkState(0)
-#                 if state == Qt.Checked:
-#                     has_checked_children = True
-#                 elif state == Qt.PartiallyChecked:
-#                     has_partially_checked_children = True
-#                 else:
-#                     has_unchecked_children = True
-#
-#             if not has_partially_checked_children and not has_unchecked_children:
-#                 new_state = Qt.Checked
-#             elif has_checked_children or has_partially_checked_children:
-#                 new_state = Qt.PartiallyChecked
-#             else:
-#                 new_state = Qt.Unchecked
-#             item.setCheckState(0, new_state)
-#
-#         self._update_selection_label()
-#
-#     def _update_selection_label(self):
-#         selected_file_count = 0
-#         selected_size = 0
-#         for node, item in self._file_items:
-#             if item.checkState(0) == Qt.Checked:
-#                 selected_file_count += 1
-#                 selected_size += node.length
-#
-#         ok_button = self._button_box.button(QDialogButtonBox.Ok)
-#         if not selected_file_count:
-#             ok_button.setEnabled(False)
-#             self._selection_label.setText('Nothing to download')
-#         else:
-#             ok_button.setEnabled(True)
-#             # self._selection_label.setText(TorrentAddingDialog.SELECTION_LABEL_FORMAT.format(
-#                 # selected_file_count, humanize_size(selected_size)))
-#
-#     def submit_torrent(self):
-#         # self._torrent_info.download_dir = self._download_dir
-#         # self._control.last_download_dir = os.path.abspath(self._download_dir)
-#         #
-#         # file_paths = []
-#         # for node, item in self._file_items:
-#         #     if item.checkState(0) == Qt.Checked:
-#         #         file_paths.append(node.path)
-#         # if not self._torrent_info.download_info.single_file_mode:
-#         #     self._torrent_info.download_info.select_files(file_paths, 'whitelist')
-#         #
-#         # self._control_thread.loop.call_soon_threadsafe(self._control.add, self._torrent_info)
-#         #
-#         self.close()
-#         pass
-#
-#
-# class TorrentAddingDialog(QDialog):
-#     SELECTION_LABEL_FORMAT = 'Selected {} files ({})'
-#
-#     def _get_directory_browse_widget(self):
-#         widget = QWidget()
-#         hbox = QHBoxLayout(widget)
-#         hbox.setContentsMargins(0, 0, 0, 0)
-#
-#         self._path_edit = QLineEdit(self._torrent_info.file.path)
-#         self._path_edit.setReadOnly(True)
-#         hbox.addWidget(self._path_edit, 4)
-#
-#         browse_button = QPushButton('Browse...')
-#         browse_button.clicked.connect(self._browse)
-#         hbox.addWidget(browse_button, 1)
-#
-#         widget.setLayout(hbox)
-#         return widget
-#
-#     def _browse(self):
-#         new_download_dir = QFileDialog.getExistingDirectory(self, 'Select download directory', self._torrent_info.file.path)
-#         if not new_download_dir:
-#             return
-#
-#         self._download_dir = new_download_dir
-#         self._path_edit.setText(new_download_dir)
-#
-#     def __init__(self, parent: QWidget, filename: str, torrent_info: TorrentInfo):
-#         super().__init__(parent)
-#         self.parent = parent
-#         #parent.torrent_added.emit(torrent_info)
-#         self._torrent_info = torrent_info
-#         # download_info = torrent_info.download_info
-#         vbox = QVBoxLayout(self)
-#         vbox.addWidget(QLabel('Download directory:'))
-#         vbox.addWidget(self._get_directory_browse_widget())
-#
-#         self._button_box = QDialogButtonBox(self)
-#         self._button_box.setOrientation(Qt.Horizontal)
-#         self._button_box.setStandardButtons(QDialogButtonBox.Cancel | QDialogButtonBox.Ok)
-#         self._button_box.button(QDialogButtonBox.Ok).clicked.connect(self.submit_torrent)
-#         self._button_box.button(QDialogButtonBox.Cancel).clicked.connect(self.close)
-#         vbox.addWidget(self._button_box)
-#
-#         self.setFixedSize(450, 550)
-#         self.setWindowTitle('Adding "{}"'.format(filename))
-#
-#     def _set_check_state_to_tree(self, item: QTreeWidgetItem, check_state: Qt.CheckState):
-#         for i in range(item.childCount()):
-#             child = item.child(i)
-#             child.setCheckState(0, check_state)
-#             self._set_check_state_to_tree(child, check_state)
-#
-#     def _update_checkboxes(self, item: QTreeWidgetItem, column: int):
-#         if column != 0:
-#             return
-#
-#         new_check_state = item.checkState(0)
-#         self._set_check_state_to_tree(item, new_check_state)
-#
-#         while True:
-#             item = item.parent()
-#             if item is None:
-#                 break
-#
-#             has_checked_children = False
-#             has_partially_checked_children = False
-#             has_unchecked_children = False
-#             for i in range(item.childCount()):
-#                 state = item.child(i).checkState(0)
-#                 if state == Qt.Checked:
-#                     has_checked_children = True
-#                 elif state == Qt.PartiallyChecked:
-#                     has_partially_checked_children = True
-#                 else:
-#                     has_unchecked_children = True
-#
-#             if not has_partially_checked_children and not has_unchecked_children:
-#                 new_state = Qt.Checked
-#             elif has_checked_children or has_partially_checked_children:
-#                 new_state = Qt.PartiallyChecked
-#             else:
-#                 new_state = Qt.Unchecked
-#             item.setCheckState(0, new_state)
-#
-#         self._update_selection_label()
-#
-#     def _update_selection_label(self):
-#         selected_file_count = 0
-#         selected_size = 0
-#         for node, item in self._file_items:
-#             if item.checkState(0) == Qt.Checked:
-#                 selected_file_count += 1
-#                 selected_size += node.length
-#
-#         ok_button = self._button_box.button(QDialogButtonBox.Ok)
-#         if not selected_file_count:
-#             ok_button.setEnabled(False)
-#             self._selection_label.setText('Nothing to download')
-#         else:
-#             ok_button.setEnabled(True)
-#             # self._selection_label.setText(TorrentAddingDialog.SELECTION_LABEL_FORMAT.format(
-#                 # selected_file_count, humanize_size(selected_size)))
-#
-#     def submit_torrent(self):
-#         """
-#         self._torrent_info.download_dir = self._download_dir
-#         self._control.last_download_dir = os.path.abspath(self._download_dir)
-#
-#         file_paths = []
-#         for node, item in self._file_items:
-#             if item.checkState(0) == Qt.Checked:
-#                 file_paths.append(node.path)
-#         if not self._torrent_info.download_info.single_file_mode:
-#             self._torrent_info.download_info.select_files(file_paths, 'whitelist')
-#
-#         self._control_thread.loop.call_soon_threadsafe(self._control.add, self._torrent_info)
-#
-#         self.close()
-#         pass
-#         """
-#         self.parent.torrent_added.emit(self._torrent_info)
-#         self.close()
-
-# class TorrentCreatingDialog(QDialog):
-#     SELECTION_LABEL_FORMAT = 'Selected {} files ({})'
-#
-#     def _get_directory_browse_widget(self):
-#         widget = QWidget()
-#         hbox = QHBoxLayout(widget)
-#         hbox.setContentsMargins(0, 0, 0, 0)
-#
-#         self._path_edit = QLineEdit(self)
-#         self._path_edit.setReadOnly(True)
-#         hbox.addWidget(self._path_edit, 4)
-#
-#         browse_button = QPushButton('Browse...')
-#         browse_button.clicked.connect(self._browse)
-#         hbox.addWidget(browse_button, 1)
-#
-#         widget.setLayout(hbox)
-#         return widget
-#
-#     def _browse(self):
-#         new_download_dir = QFileDialog.getExistingDirectory(self, 'Select download directory', self.path)
-#         if not new_download_dir:
-#             return
-#
-#         self._download_dir = new_download_dir
-#         self._path_edit.setText(new_download_dir)
-#
-#     def __init__(self, parent: QWidget, path):
-#         super().__init__(parent)
-#         # download_info = torrent_info.download_info
-#         vbox = QVBoxLayout(self)
-#
-#         vbox.addWidget(QLabel('Path to file:'))
-#         vbox.addWidget(self._get_directory_browse_widget())
-#
-#         vbox.addWidget(QLabel('Tracker:'))
-#         self._path_edit = QLineEdit(self)
-#         self._path_edit.setReadOnly(False)
-#         vbox.addWidget(self._path_edit, 4)
-#
-#         self._button_box = QDialogButtonBox(self)
-#         self._button_box.setOrientation(Qt.Horizontal)
-#         self._button_box.setStandardButtons(QDialogButtonBox.Cancel | QDialogButtonBox.Ok)
-#         self._button_box.button(QDialogButtonBox.Ok).clicked.connect(self.submit_torrent)
-#         self._button_box.button(QDialogButtonBox.Cancel).clicked.connect(self.close)
-#         vbox.addWidget(self._button_box)
-#
-#         # self.setFixedSize(250, 200)
-#         self.setWindowTitle('Create torrent')
-#         self.path = path
-#
-#     def _set_check_state_to_tree(self, item: QTreeWidgetItem, check_state: Qt.CheckState):
-#         for i in range(item.childCount()):
-#             child = item.child(i)
-#             child.setCheckState(0, check_state)
-#             self._set_check_state_to_tree(child, check_state)
-#
-#     def _update_checkboxes(self, item: QTreeWidgetItem, column: int):
-#         if column != 0:
-#             return
-#
-#         new_check_state = item.checkState(0)
-#         self._set_check_state_to_tree(item, new_check_state)
-#
-#         while True:
-#             item = item.parent()
-#             if item is None:
-#                 break
-#
-#             has_checked_children = False
-#             has_partially_checked_children = False
-#             has_unchecked_children = False
-#             for i in range(item.childCount()):
-#                 state = item.child(i).checkState(0)
-#                 if state == Qt.Checked:
-#                     has_checked_children = True
-#                 elif state == Qt.PartiallyChecked:
-#                     has_partially_checked_children = True
-#                 else:
-#                     has_unchecked_children = True
-#
-#             if not has_partially_checked_children and not has_unchecked_children:
-#                 new_state = Qt.Checked
-#             elif has_checked_children or has_partially_checked_children:
-#                 new_state = Qt.PartiallyChecked
-#             else:
-#                 new_state = Qt.Unchecked
-#             item.setCheckState(0, new_state)
-#
-#         self._update_selection_label()
-#
-#     def _update_selection_label(self):
-#         selected_file_count = 0
-#         selected_size = 0
-#         for node, item in self._file_items:
-#             if item.checkState(0) == Qt.Checked:
-#                 selected_file_count += 1
-#                 selected_size += node.length
-#
-#         ok_button = self._button_box.button(QDialogButtonBox.Ok)
-#         if not selected_file_count:
-#             ok_button.setEnabled(False)
-#             self._selection_label.setText('Nothing to download')
-#         else:
-#             ok_button.setEnabled(True)
-#             # self._selection_label.setText(TorrentAddingDialog.SELECTION_LABEL_FORMAT.format(
-#                 # selected_file_count, humanize_size(selected_size)))
-#
-#     def submit_torrent(self):
-#         # self._torrent_info.download_dir = self._download_dir
-#         # self._control.last_download_dir = os.path.abspath(self._download_dir)
-#         #
-#         # file_paths = []
-#         # for node, item in self._file_items:
-#         #     if item.checkState(0) == Qt.Checked:
-#         #         file_paths.append(node.path)
-#         # if not self._torrent_info.download_info.single_file_mode:
-#         #     self._torrent_info.download_info.select_files(file_paths, 'whitelist')
-#         #
-#         # self._control_thread.loop.call_soon_threadsafe(self._control.add, self._torrent_info)
-#         #
-#         # self.close()
-#         pass
-#
-#
-# class TorrentAddingDialog(QDialog):
-#     SELECTION_LABEL_FORMAT = 'Selected {} files ({})'
-#
-#     def _get_directory_browse_widget(self):
-#         widget = QWidget()
-#         hbox = QHBoxLayout(widget)
-#         hbox.setContentsMargins(0, 0, 0, 0)
-#
-#         self._path_edit = QLineEdit(self._torrent_info.file.path)
-#         self._path_edit.setReadOnly(True)
-#         hbox.addWidget(self._path_edit, 4)
-#
-#         browse_button = QPushButton('Browse...')
-#         browse_button.clicked.connect(self._browse)
-#         hbox.addWidget(browse_button, 1)
-#
-#         widget.setLayout(hbox)
-#         return widget
-#
-#     def _browse(self):
-#         new_download_dir = QFileDialog.getExistingDirectory(self, 'Select download directory', self._torrent_info.file.path)
-#         if not new_download_dir:
-#             return
-#
-#         self._download_dir = new_download_dir
-#         self._path_edit.setText(new_download_dir)
-#
-#     def __init__(self, parent: QWidget, filename: str, torrent_info: TorrentInfo):
-#         super().__init__(parent)
-#         self.parent = parent
-#         #parent.torrent_added.emit(torrent_info)
-#         self._torrent_info = torrent_info
-#         # download_info = torrent_info.download_info
-#         vbox = QVBoxLayout(self)
-#         vbox.addWidget(QLabel('Download directory:'))
-#         vbox.addWidget(self._get_directory_browse_widget())
-#
-#         self._button_box = QDialogButtonBox(self)
-#         self._button_box.setOrientation(Qt.Horizontal)
-#         self._button_box.setStandardButtons(QDialogButtonBox.Cancel | QDialogButtonBox.Ok)
-#         self._button_box.button(QDialogButtonBox.Ok).clicked.connect(self.submit_torrent)
-#         self._button_box.button(QDialogButtonBox.Cancel).clicked.connect(self.close)
-#         vbox.addWidget(self._button_box)
-#
-#         self.setFixedSize(400, 100)
-#         self.setWindowTitle('Adding "{}"'.format(filename))
-#
-#     def _set_check_state_to_tree(self, item: QTreeWidgetItem, check_state: Qt.CheckState):
-#         for i in range(item.childCount()):
-#             child = item.child(i)
-#             child.setCheckState(0, check_state)
-#             self._set_check_state_to_tree(child, check_state)
-#
-#     def _update_checkboxes(self, item: QTreeWidgetItem, column: int):
-#         if column != 0:
-#             return
-#
-#         new_check_state = item.checkState(0)
-#         self._set_check_state_to_tree(item, new_check_state)
-#
-#         while True:
-#             item = item.parent()
-#             if item is None:
-#                 break
-#
-#             has_checked_children = False
-#             has_partially_checked_children = False
-#             has_unchecked_children = False
-#             for i in range(item.childCount()):
-#                 state = item.child(i).checkState(0)
-#                 if state == Qt.Checked:
-#                     has_checked_children = True
-#                 elif state == Qt.PartiallyChecked:
-#                     has_partially_checked_children = True
-#                 else:
-#                     has_unchecked_children = True
-#
-#             if not has_partially_checked_children and not has_unchecked_children:
-#                 new_state = Qt.Checked
-#             elif has_checked_children or has_partially_checked_children:
-#                 new_state = Qt.PartiallyChecked
-#             else:
-#                 new_state = Qt.Unchecked
-#             item.setCheckState(0, new_state)
-#
-#         self._update_selection_label()
-#
-#     def _update_selection_label(self):
-#         selected_file_count = 0
-#         selected_size = 0
-#         for node, item in self._file_items:
-#             if item.checkState(0) == Qt.Checked:
-#                 selected_file_count += 1
-#                 selected_size += node.length
-#
-#         ok_button = self._button_box.button(QDialogButtonBox.Ok)
-#         if not selected_file_count:
-#             ok_button.setEnabled(False)
-#             self._selection_label.setText('Nothing to download')
-#         else:
-#             ok_button.setEnabled(True)
-#             # self._selection_label.setText(TorrentAddingDialog.SELECTION_LABEL_FORMAT.format(
-#                 # selected_file_count, humanize_size(selected_size)))
-#
-#     def submit_torrent(self):
-#         """
-#         self._torrent_info.download_dir = self._download_dir
-#         self._control.last_download_dir = os.path.abspath(self._download_dir)
-#
-#         file_paths = []
-#         for node, item in self._file_items:
-#             if item.checkState(0) == Qt.Checked:
-#                 file_paths.append(node.path)
-#         if not self._torrent_info.download_info.single_file_mode:
-#             self._torrent_info.download_info.select_files(file_paths, 'whitelist')
-#
-#         self._control_thread.loop.call_soon_threadsafe(self._control.add, self._torrent_info)
-#
-#         self.close()
-#         pass
-#         """
-#         self.parent.torrent_added.emit(self._torrent_info)
-#         self.close()
 
 
 UNIT_BASE = 2 ** 10
@@ -615,11 +104,15 @@ class TorrentListWidgetItem(QWidget):
 
         vbox.addWidget(self.lower_status_label)
 
+        self.num_peers = 0
+
         self._state = None
         self._waiting_control_action = False
 
     def update_progress(self, progress):
         self.progress_bar.setValue(progress)
+        if progress == 100:
+            self.lower_status_label.setText('Seeding...')
 
     def set_name(self, name):
         self._name_label.setText(name)
@@ -700,12 +193,16 @@ class Example(QMainWindow):
 #    def closeEvent(self, *args, **kwargs):
 
 
-    def _add_torrent_item(self, torrent_info):
+    def _add_torrent_item(self, torrent_info, seed):
         queue = mp.Queue()
         widget = TorrentListWidgetItem(queue, torrent_info.info['length'])
         widget.set_name(torrent_info.name)
         widget.set_lower_status('Announcing...')
-        widget.progress_bar.setValue(0)
+        if seed:
+            widget.progress_bar.setValue(100)
+            widget.set_lower_status('Seeding...')
+        else:
+            widget.progress_bar.setValue(0)
 
         item = QListWidgetItem()
         item.setSizeHint(widget.sizeHint())
@@ -722,12 +219,24 @@ class Example(QMainWindow):
 
 
         # Announce.
-        torrent_info.update(0, '01234567890123456789', 5555)
+        if seed:
+            torrent_info.downloaded = torrent_info.file.size
+            torrent_info.update(0, '01234567890123456789', 5555, 0)
+        else:
+            torrent_info.update(0, '01234567890123456789', 5555, torrent_info.file.size)
+
+        widget.num_peers = len(torrent_info.tracker.peers) - 1
+        if not seed:
+            widget.lower_status_label.setText('Downloading from ' + str(widget.num_peers) + 'peers')
 
         peer = Peer.Peer(torrent_info, '192.168.1.10', 5555, b'01234567890123456789')
-        process = mp.Process(target=peer.send_handshake, args=[queue])
 
-        widget.updater_thread.start()
+        process = None
+        if seed:
+            process = mp.Process(target=peer.start_seeding, args=[None])
+        else:
+            process = mp.Process(target=peer.send_handshake, args=[queue])
+            widget.updater_thread.start()
 
         # Starts downloader/uploader process.
         process.start()
@@ -765,27 +274,14 @@ class Example(QMainWindow):
     def _show_about(self):
         pass
 
-    # Ovo je kopirano iz benocde-test.py, 45 linija
-    # Verovatno ce ovde i ostati.
-    def parse_torrent_file(self, file):
-        with open(file, 'rb') as f:
-            data = f.read()
-            be_data = bencode.decode(data)
-            return be_data
-
     def add_torrent_files(self, path):
         try:
-            # download se vrvt nece koristiti ali za sad ga stavljam da ne bi bacao exception u
-            # TorrentInfo.Torrent(...) konstruktoru u 320. liniji.
-
-            b_dict = self.parse_torrent_file(path)
+            b_dict = utils.parse_torrent_file(path)
             tracker = TrackerInfo.Tracker(b_dict['announce'])
             info = b_dict['info']
 
-            # drugi i treci parametar za sad nek ostanu prazni stringovi
-            # to su sada neke putanje, ali mi se ne svidja kako sam za sad to uradio.
-
             default_path = path.replace(info['name'] + '.torrent', '')
+            file_path = path.replace('.torrent', '')
 
             torrent_info = TorrentInfo.Torrent(info, '', default_path, tracker)
 
@@ -795,9 +291,20 @@ class Example(QMainWindow):
             else:
                 return
 
+            download_path = download_path + info['name']
+            piece_length = (2**9) * 1000  # 512kB
+            if os.path.exists(download_path):
+                result = utils.compare_files(download_path, info['pieces'], piece_length)
+            else:
+                result = False
             self._update_control_action_state()
 
-            self._add_torrent_item(torrent_info)
+            if result:
+                # files are identical
+                self._add_torrent_item(torrent_info, True)
+            else:
+                self._add_torrent_item(torrent_info, False)
+
         except Exception as err:
             pass
 

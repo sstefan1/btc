@@ -56,11 +56,11 @@ class Torrent:
         # Matrix of dimensions [piece_size][piece_size / block_size]
         self.block_verified = None
 
-    def update(self, event, peerid, port):
-        self.tracker.update(self, event, peerid, port)
+    def update(self, event, peerid, port, left):
+        self.tracker.update(self, event, peerid, port, left)
 
     def download_path(self):
-        return self.download_dir + '/' + self.name
+        return self.download_dir + self.name
 
     def pieces(self):
         data = self.info['pieces']

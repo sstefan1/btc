@@ -1,6 +1,8 @@
 import socket, select, errno
 from torrent import protocol
 from torrent import PieceManager
+import time
+import os
 
 
 class Peer:
@@ -152,8 +154,9 @@ class Peer:
         i = 0
         while True:
             if self.piece_manager.fd.closed:
-                return
-                # self.start_seeding()
+                self.piece_manager.fd = open(self.torrent.download_path(), 'rb')
+                self.start_seeding(self.piece_manager)
+                # return
             if self.chocked:
                 # self.send_interested()
                 sockets = self.dict_to_list(self.peers_sockets)
@@ -242,12 +245,13 @@ class Peer:
                         continue
                     piece_message = protocol.decode_piece(data)
                     # self.my_state.remove('pending_request')
-                    queue.put(message[0])
                     self.piece_manager.block_received(peer_id=self.remote_id,
                                                       piece_index=piece_message[2],
                                                       block_offset=piece_message[3],
                                                       data=piece_message[4])
-                    # print("\t\tRECEIVED BLOCK")
+
+                    queue.put(len(piece_message[4]))
+                    time.sleep(0.01)
                     request_piece = True
                 elif message_type == protocol.PeerMessage.Request:
                     pass
@@ -262,10 +266,15 @@ class Peer:
 
     """
     For now this client only supports seeding complete file
+    manager should be None if called without downloading
     """
-    def start_seeding(self):
+    def start_seeding(self, manager):
         host = ''
         port = self.port
+        if manager is None:
+            fd = open(self.torrent.download_path(), 'rb')
+        else:
+            fd = manager.fd
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
             server.bind((host, port))
             # max 5 queued connections
@@ -273,47 +282,96 @@ class Peer:
             server.setblocking(0)
 
             read_list = [server]
-            peer_read_list = []
+            self.peer_read_list = []
 
             while True:
-                readable, _, _ = select.select(read_list, [], [])
+                readable, _, _ = select.select(read_list, [], [], 0)
                 for s in readable:
                     peer_socket, address = s.accept()
-                    peer_read_list.append(s)
-                    print('connected to: ' + address)
+                    self.peer_read_list.append(peer_socket)
+                    print('connected to: ' + str(address))
 
-                readable, _, _ = select.select(peer_read_list, [], [])
+                if not self.peer_read_list:
+                    continue
 
-                data = None
+                readable, _, _ = select.select(self.peer_read_list, [], [], 0)
+
+                # data = None
                 for s in readable:
-                    data = s.recv(protocol.REQUEST_SIZE)
-
-                    if len(data) == 68:
-                        self.handshake_response(s)
+                    # data = s.recv(protocol.REQUEST_SIZE)
+                    data = self.socket_recv(protocol.REQUEST_SIZE, s)
+                    if not data:
                         continue
 
-                    message = protocol.decode_no_payload(data)
+                    while data:
+                        if len(data) == 68 and b'protocol' in data:
+                            self.handshake_response(s)
+                            piece_count = len(self.torrent.piece_hashes) // 20
+                            for i in range(piece_count):
+                                have = protocol.encode_have(i)
+                                self.socket_send(s, have)
+                            data = data[68:]
 
-                    """
-                    If interested is received, immediately send unchoke
-                    and have for whole file.
-                    This client doesn't send bitfield messages
-                    """
-                    if message[0] == protocol.PeerMessage.Interested:
-                        unchoke = protocol.encode_unchoke()
-                        self.socket_send(s, unchoke)
-                        for i in range(self.piece_manager.total_pieces):
-                            have = protocol.encode_have(i)
-                            self.socket_send(s, have)
+                            # data = None
+                            continue
 
-                    elif message[0] == protocol.PeerMessage.Request:
-                        request = protocol.decode_request(data)
-                        block = self.piece_manager.read(request[0], request[1], request[2])
-                        piece_msg = protocol.encode_piece(request[0], request[1], request[2])
-                        self.socket_send(s, piece_msg)
+                        message = protocol.decode_no_payload(data)
 
+                        if message[1] == protocol.PeerMessage.BitField:
+                            data = data[4+message[0]:]
+                            continue
+                        if message[1] == protocol.PeerMessage.Piece:
+                            data = data[4+message[0]:]
+                            continue
+                        if message[1] == protocol.PeerMessage.NotInterested:
+                            data = data[5:]
+                            continue
+                        if message[0] == 0:
+                            # Keep???
+                            data = data[:4]
+                            continue
+                        if message[1] == protocol.PeerMessage.Cancel:
+                            data = data[17:]
+                            continue
+                        if message[1] == protocol.PeerMessage.Choke:
+                            data = data[5:]
+                            continue
+                        if message[1] == protocol.PeerMessage.Unchoke:
+                            data = data[5:]
+                            continue
+                        if message[1] == protocol.PeerMessage.Have:
+                            # eat it up.
+                            data = data[5:]
+                            continue
+                        if message[1] == protocol.PeerMessage.Interested:
+                            """
+                            If interested is received, immediately send unchoke
+                            and have for whole file.
+                            This client doesn't send bitfield messages
+                            """
+                            unchoke = protocol.encode_unchoke()
+                            self.socket_send(s, unchoke)
+                            # eat processed data.
+                            data = data[5:]
 
+                        elif message[1] == protocol.PeerMessage.Request:
+                            """
+                            If Request is received, read the block and send
+                            the data.
+                            """
+                            request = protocol.decode_request(data)
+                            # block = self.piece_manager.read(request[0], request[1], request[2])
 
+                            # read params: fd, index, begin, length
+                            block = self.read(fd, request[2], request[3], request[4])
+
+                            # encode_piece params: index, begin, block
+                            piece_msg = protocol.encode_piece(request[2], request[3], block)
+                            self.socket_send(s, piece_msg)
+                            time.sleep(0.001)
+                            print('sent' + str(len(block)))
+                            # eat processed data.
+                            data = data[17:]
 
     def handshake_response(self, socket):
         name_length = bytes([19])
@@ -347,23 +405,23 @@ class Peer:
         try:
             p_socket.send(data)
         except socket.error as e:
+            if p_socket in self.peer_read_list:
+                self.peer_read_list.remove(p_socket)
             print(e)
-            peers = self.torrent.tracker.peers
-            peer = peers[1]
-            self.peer_socket.close()
-            self.peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.peer_socket.connect((peer[0], peer[1]))
+            # peers = self.torrent.tracker.peers
+            # peer = peers[1]
+            # self.peer_socket.close()
+            # self.peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # self.peer_socket.connect((peer[0], peer[1]))
 
     def socket_recv(self, len, peer_socket):
         try:
             return peer_socket.recv(len);
         except socket.error as e:
+            if peer_socket in self.peer_read_list:
+                self.peer_read_list.remove(peer_socket)
             print(e)
             peers = self.torrent.tracker.peers
-            peer = peers[1]
-            self.peer_socket.close()
-            self.peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.peer_socket.connect((peer[0], peer[1]))
 
     def set_nonblocking(self):
         for _, s in self.peers_sockets.items():
@@ -375,3 +433,9 @@ class Peer:
             list.append(value)
 
         return list
+
+    def read(self, fd, piece, offset, length):
+        pos = piece * self.torrent.piece_size + offset
+        fd.seek(pos, os.SEEK_SET)
+        data = fd.read(length)
+        return data

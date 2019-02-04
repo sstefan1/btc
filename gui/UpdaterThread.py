@@ -29,5 +29,5 @@ class UpdaterThread(QThread):
             print('gpt {0}'.format(num))
             progress = (num / self.file_size) * 100
             self.progress_update.emit(progress)
-            if num == 100:
+            if progress == 100:
                 return

@@ -56,7 +56,7 @@ class Tracker:
             #  port = ntohs(int(peer_info[offset + 4:offset + 6]))
             self.peers.append((ip_address, port))
 
-    def update(self, torrent, event, peerid, port):
+    def update(self, torrent, event, peerid, port, left):
         # this check will be performed later.
         # if event == TrackerEvent.STARTED and datetime.now() < self.lastPeerRequest + self.peerRequestInterval:
             # return
@@ -65,7 +65,7 @@ class Tracker:
         url_string = "{}?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&event={}&compact=1"
         url = url_string.format(self.address, torrent.safeUrl,
                                 str(peerid), port, torrent.uploaded,
-                                torrent.downloaded, torrent.file.size,
+                                torrent.downloaded, left,
                                 tracker_event_string(event))
 
         url_hardcoded_1 = "http://192.168.1.9:6969/announce?info_hash=%9E%D5%B1%A6%CD%5E%CB%F21%AAv%C0P%D2%1F!%813%12%CC&peer_id=01234567890123456789&port=6881&uploaded=0&downloaded=0&left=5257556&compact=1&event=started"

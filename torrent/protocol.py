@@ -125,7 +125,7 @@ def decode_request(data):
     :param data: data to be decoded
     :return: message
     """
-    parts = struct.unpack('>IbIII', data)
+    parts = struct.unpack('>IbIII', data[:17])
     return parts
 
 

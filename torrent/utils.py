@@ -44,3 +44,13 @@ def parse_torrent_file(file):
         data = f.read()
         be_data = bencode.decode(data)
         return be_data
+
+
+def compare_files(file, pieces_hash, BUFF_SIZE):
+    file1_sha1 = sha1_file(file, BUFF_SIZE)
+    # file2_sha1 = sha1_file(file2, BUFF_SIZE)
+
+    if file1_sha1 == pieces_hash:
+        return True
+    else:
+        return False

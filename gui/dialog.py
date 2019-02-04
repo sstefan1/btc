@@ -1,22 +1,9 @@
-import sys
-import os
-import bencode
-
-from functools import partial, partialmethod
-from PyQt5.QtWidgets import QMainWindow, QTextEdit, QAction, QApplication
-from PyQt5.QtGui import QIcon, QFont, QDropEvent
-from typing import Dict, List, Optional
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 
-from PyQt5.QtWidgets import QWidget, QListWidget, QAbstractItemView, QLabel, QVBoxLayout, QProgressBar, \
-    QListWidgetItem, QMainWindow, QApplication, QFileDialog, QMessageBox, QDialog, QDialogButtonBox, QTreeWidget, \
-    QTreeWidgetItem, QHeaderView, QHBoxLayout, QPushButton, QLineEdit, QAction
+from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QFileDialog, QDialog, QDialogButtonBox, \
+    QTreeWidgetItem, QHBoxLayout, QPushButton, QLineEdit
 
 from torrent import TrackerInfo, TorrentInfo, Peer, utils
-import multiprocessing as mp
-
-from math import floor, log
-
 
 
 class TorrentCreatingDialog(QDialog):
